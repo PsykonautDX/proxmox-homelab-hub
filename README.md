@@ -6,6 +6,23 @@ Built in pure Python (no Node.js build chain required) with a **dual-surface arc
 
 ---
 
+## Screenshots
+
+*(Captured in built-in Interactive Demo Mode)*
+
+### Command Overview — Telemetry, Service Pulse, iDRAC Power & Homelab Doctor
+![Command Overview](./docs/screenshots/01-command-overview.png)
+
+| Compute & Service Fleet (VMs, LXCs, Docker, Uptime) | Deployment Forge (780+ Community Scripts & Provisioning) |
+| :---: | :---: |
+| ![Compute & Service Fleet](./docs/screenshots/02-fleet.png) | ![Deployment Forge](./docs/screenshots/03-deploy.png) |
+
+| Storage & File Matrix (Pools, ZFS, SMART SSD Life) | Network & Access Grid (IPAM Matrix, Topology, WoL) |
+| :---: | :---: |
+| ![Storage & File Matrix](./docs/screenshots/04-storage.png) | ![Network & Access Grid](./docs/screenshots/05-network.png) |
+
+---
+
 ## Quick Deploy in Portainer (Docker Compose)
 
 > Full instructions (including Git Stack deployment) are in [PORTAINER_DEPLOY.md](./PORTAINER_DEPLOY.md).
