@@ -1,7 +1,7 @@
 services:
   proxmox-hub:
+    image: ghcr.io/psykonautdx/proxmox-homelab-hub:latest
     build: .
-    image: proxmox-homelab-hub:latest
     container_name: proxmox-homelab-hub
     restart: unless-stopped
     ports:
