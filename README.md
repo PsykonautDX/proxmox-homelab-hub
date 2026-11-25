@@ -25,10 +25,10 @@ Built in pure Python (no Node.js build chain required) with a **dual-surface arc
 
 ## Quick Deploy in Portainer (Docker Compose)
 
-> Full instructions (including Git Stack deployment) are in [PORTAINER_DEPLOY.md](./PORTAINER_DEPLOY.md).
+> **Zero YAML config required:** deploy the stack as-is and configure your Proxmox host, API token, and optional iDRAC/TrueNAS settings directly inside the WebUI (**06 SYSTEM → MCP & Settings**). Everything persists automatically in `/app/data`. Full guide in [PORTAINER_DEPLOY.md](./PORTAINER_DEPLOY.md).
 
 ### Option A: Portainer Web Editor (Pre-Built GHCR Image)
-In **Portainer → Stacks → + Add stack → Web editor**, paste [`docker-compose.portainer.yml`](./docker-compose.portainer.yml):
+In **Portainer → Stacks → + Add stack → Web editor**, paste this as-is and click **Deploy the stack**:
 
 ```yaml
 services:
@@ -39,18 +39,7 @@ services:
     ports:
       - "8806:8806"
     environment:
-      TZ: Europe/London
-      WEBUI_HOST: 0.0.0.0
-      WEBUI_PORT: 8806
-      PROXMOX_DATA_DIR: /app/data
-      PROXMOX_ENV_FILE: /app/data/.env
-      PROXMOX_HOST: https://your-proxmox-ip:8006
-      PROXMOX_TOKEN_ID: ""
-      PROXMOX_TOKEN_SECRET: ""
-      PROXMOX_VERIFY_SSL: "false"
-      SAFETY_MODE: safe
-      ALLOW_DESTRUCTIVE: "false"
-      PROXMOX_DEMO_MODE: "false"
+      - TZ=Europe/London
     volumes:
       - proxmox_hub_data:/app/data
 
@@ -58,13 +47,14 @@ volumes:
   proxmox_hub_data:
 ```
 
-### Option B: Portainer Git Stack (Build Directly from GitHub)
+### Option B: Portainer Git Stack (Straight from GitHub)
 In **Portainer → Stacks → + Add stack → Repository**:
 - **Repository URL:** `https://github.com/PsykonautDX/proxmox-homelab-hub.git`
 - **Reference:** `refs/heads/main`
 - **Compose path:** `docker-compose.yml`
+- **Authentication:** `OFF` (public repo)
 
-After deploying, open **`http://<your-docker-host-ip>:8806`** and enter your Proxmox host & API token under **06 SYSTEM → MCP & Settings** (or set `PROXMOX_DEMO_MODE: "true"` to preview with simulated data immediately).
+After deploying, open **`http://<your-docker-host-ip>:8806`** and configure your Proxmox host & API token right in the WebUI (**06 SYSTEM → MCP & Settings**), or try Interactive Demo Mode first.
 
 ---
 
