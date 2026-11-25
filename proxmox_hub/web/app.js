@@ -258,7 +258,7 @@ const VIEW_META = {
   command: { title: "Command Overview", kicker: "PARADIGM 01 // TELEMETRY & CONSTELLATION" },
   fleet: { title: "Compute & Service Fleet", kicker: "PARADIGM 02 // GUESTS · DOCKER · UPTIME · SIZING" },
   deploy: { title: "Deployment Forge", kicker: "PARADIGM 03 // COMMUNITY SCRIPTS · PROVISIONING · ISOS" },
-  storage: { title: "Storage & File Matrix", kicker: "PARADIGM 04 // POOLS · ZFS · BACKUPS · EXPLORER" },
+  storage: { title: "Storage & File Matrix", kicker: "PARADIGM 04 // POOLS · ZFS · TRUENAS · BACKUPS · EXPLORER" },
   network: { title: "Network & Access Grid", kicker: "PARADIGM 05 // IPAM · WAKE-ON-LAN · FIREWALL" },
   system: { title: "System Core & MCP", kicker: "PARADIGM 06 // IDRAC · UPDATES · AUDIT · SETTINGS" },
 };
@@ -399,6 +399,15 @@ async function toggleDemoMode(enabled) {
         proxmox_token_id: state.settings.proxmox_token_id,
         proxmox_verify_ssl: state.settings.proxmox_verify_ssl,
         proxmox_timeout: state.settings.proxmox_timeout,
+        proxmox_ssh_user: state.settings.proxmox_ssh_user,
+        proxmox_ssh_port: state.settings.proxmox_ssh_port,
+        proxmox_ssh_key_path: state.settings.proxmox_ssh_key_path,
+        idrac_host: state.settings.idrac_host,
+        idrac_user: state.settings.idrac_user,
+        electricity_rate_kwh: state.settings.electricity_rate_kwh,
+        currency_symbol: state.settings.currency_symbol,
+        truenas_host: state.settings.truenas_host,
+        truenas_verify_ssl: state.settings.truenas_verify_ssl,
         safety_mode: state.settings.safety_mode,
         allow_destructive: state.settings.allow_destructive,
         proxmox_demo_mode: enabled,
@@ -462,6 +471,7 @@ async function loadActiveView(forceInsights = true) {
     } else if (state.view === "storage") {
       const sub = state.subtabs.storage;
       if (sub === "pools" || sub === "backups") await loadStorage(forceInsights);
+      else if (sub === "truenas") await mh.loadTrueNAS(false);
       else if (sub === "files") await extras.loadFileExplorer();
     } else if (state.view === "network") {
       const sub = state.subtabs.network;
@@ -571,6 +581,8 @@ async function loadOverview() {
             actionBtn = `<button class="btn btn-xs btn-primary" data-fix-storage="${esc(f.action_storage)}">Inspect '${esc(f.action_storage)}' →</button>`;
           } else if (f.action_kind === "schedule_backups") {
             actionBtn = `<button class="btn btn-xs btn-primary" data-fix-backups="1">Schedule PBS →</button>`;
+          } else if (f.action_kind === "truenas") {
+            actionBtn = `<button class="btn btn-xs btn-primary" data-fix-truenas="1">Inspect TrueNAS →</button>`;
           }
           return `
         <div class="finding ${esc(f.severity)}">
@@ -620,6 +632,9 @@ async function loadOverview() {
         form.scrollIntoView({ behavior: "smooth", block: "center" });
       }
     })
+  );
+  $$("[data-fix-truenas]").forEach((btn) =>
+    btn.addEventListener("click", () => navigate("storage", "truenas"))
   );
 
   // Load Live Service Pulse & Dell R640 iDRAC Power/Thermals HUD on Command Overview
@@ -2036,12 +2051,20 @@ function populateSettingsForm() {
   if (f.elements.idrac_password) f.elements.idrac_password.value = "";
   if (f.elements.electricity_rate_kwh) f.elements.electricity_rate_kwh.value = s.electricity_rate_kwh ?? 0.26;
   if (f.elements.currency_symbol) f.elements.currency_symbol.value = s.currency_symbol || "£";
+  if (f.elements.truenas_host) f.elements.truenas_host.value = s.truenas_host || "";
+  if (f.elements.truenas_api_key) f.elements.truenas_api_key.value = "";
+  if (f.elements.truenas_verify_ssl) f.elements.truenas_verify_ssl.checked = Boolean(s.truenas_verify_ssl);
   f.elements.proxmox_verify_ssl.checked = Boolean(s.proxmox_verify_ssl);
   f.elements.allow_destructive.checked = Boolean(s.allow_destructive);
   f.elements.proxmox_demo_mode.checked = Boolean(s.proxmox_demo_mode);
   $("#saved-secret-hint").textContent = s.has_token_secret
     ? `Saved secret: ${s.proxmox_token_secret_masked}`
     : "No secret saved yet.";
+  if ($("#saved-truenas-hint")) {
+    $("#saved-truenas-hint").textContent = s.has_truenas_api_key
+      ? `Saved API key: ${s.truenas_api_key_masked}`
+      : "No TrueNAS API key saved yet.";
+  }
 }
 
 function renderMcpPanel() {
@@ -2311,6 +2334,9 @@ function bindEvents() {
           idrac_password: String(fd.get("idrac_password") || "") || null,
           electricity_rate_kwh: Number(fd.get("electricity_rate_kwh") || 0.26),
           currency_symbol: String(fd.get("currency_symbol") || "£"),
+          truenas_host: String(fd.get("truenas_host") || ""),
+          truenas_api_key: String(fd.get("truenas_api_key") || "") || null,
+          truenas_verify_ssl: fd.get("truenas_verify_ssl") === "on",
           safety_mode: String(fd.get("safety_mode")),
           proxmox_verify_ssl: fd.get("proxmox_verify_ssl") === "on",
           allow_destructive: fd.get("allow_destructive") === "on",
@@ -2338,6 +2364,25 @@ function bindEvents() {
     } catch (err) {
       box.className = "test-result err";
       box.textContent = `Connection failed: ${err.message}`;
+    }
+  });
+
+  $("#btn-test-truenas")?.addEventListener("click", async () => {
+    const box = $("#test-conn-result");
+    box.className = "test-result";
+    box.textContent = "Testing TrueNAS connection (read-only)...";
+    try {
+      const res = await api("/api/settings/test-truenas", { method: "POST" });
+      if (res.ok) {
+        box.className = "test-result ok";
+        box.innerHTML = `<strong>TrueNAS Connected!</strong> ${esc(res.hostname)} — <code>${esc(res.version)}</code> (${esc(res.transport)}) · Pools: <strong>${res.pools_total}</strong>${res.pools_degraded ? ` (${res.pools_degraded} degraded)` : ""} · Alerts: <strong>${res.active_alerts}</strong>`;
+      } else {
+        box.className = "test-result err";
+        box.textContent = `TrueNAS check failed: ${res.error || "Unknown error"}`;
+      }
+    } catch (err) {
+      box.className = "test-result err";
+      box.textContent = `TrueNAS connection failed: ${err.message}`;
     }
   });
 

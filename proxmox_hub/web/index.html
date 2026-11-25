@@ -54,7 +54,7 @@
           </div>
         </div>
         <div class="mcp-chip">
-          <span class="tag tag-cyan">44 MCP TOOLS</span>
+          <span class="tag tag-cyan">45 MCP TOOLS</span>
           <span class="mono small">/mcp + stdio</span>
         </div>
       </div>
@@ -118,6 +118,24 @@
               </div>
               <div id="cmd-idrac-mini"></div>
             </div>
+          </div>
+
+          <div class="card" id="cmd-truenas-card">
+            <div class="card-header">
+              <div>
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                  <h2>Bare-Metal TrueNAS Storage</h2>
+                  <span class="tag tag-emerald">READ-ONLY</span>
+                  <span class="status-pill subtle hidden" id="cmd-truenas-pill"></span>
+                </div>
+                <p class="muted" id="cmd-truenas-sub">ZFS pool health, capacity, disk errors &amp; active alerts</p>
+              </div>
+              <div style="display:flex;gap:6px;">
+                <a class="btn btn-xs btn-ghost hidden" id="btn-cmd-truenas-open" href="#" target="_blank" rel="noopener">↗ TrueNAS UI</a>
+                <button class="btn btn-xs btn-ghost" id="btn-cmd-truenas-all">Storage Matrix →</button>
+              </div>
+            </div>
+            <div id="cmd-truenas-mini"></div>
           </div>
 
           <div class="two-col">
@@ -531,8 +549,14 @@
         <section class="view" id="view-storage">
           <div class="subtab-bar" data-group="storage">
             <button class="subtab active" data-sub="pools">Pools, ZFS, SMART &amp; Mounts</button>
+            <button class="subtab" data-sub="truenas">TrueNAS Host</button>
             <button class="subtab" data-sub="backups">PBS Coverage &amp; Scheduler</button>
             <button class="subtab" data-sub="files">Dual-Mode File Explorer</button>
+          </div>
+
+          <!-- Sub-pane: Bare-Metal TrueNAS Host (Read-Only Monitoring) -->
+          <div class="subpane" id="sub-storage-truenas">
+            <div id="truenas-wrap"></div>
           </div>
 
           <!-- Sub-pane: Pools, ZFS, SMART & Bind Mounts -->
@@ -907,7 +931,7 @@
               <div class="card">
                 <div class="card-header">
                   <div>
-                    <h2>Proxmox VE, SSH &amp; Dell iDRAC Settings</h2>
+                    <h2>Proxmox VE, SSH, Dell iDRAC &amp; TrueNAS Settings</h2>
                     <p class="muted">Saved locally to <code>.env</code> — never transmitted externally</p>
                   </div>
                 </div>
@@ -947,14 +971,26 @@
                     </div>
                   </div>
 
+                  <div class="field">
+                    <label>TrueNAS Host URL (optional, read-only)</label>
+                    <input class="input mono" name="truenas_host" placeholder="https://192.168.1.x" />
+                  </div>
+                  <div class="field">
+                    <label>TrueNAS API Key (User → API Keys)</label>
+                    <input class="input mono" name="truenas_api_key" type="password" placeholder="Leave blank to keep saved key" />
+                    <span class="hint mono" id="saved-truenas-hint"></span>
+                  </div>
+
                   <div class="field full checkbox-row">
                     <label><input type="checkbox" name="proxmox_verify_ssl" /> Verify Proxmox SSL</label>
+                    <label><input type="checkbox" name="truenas_verify_ssl" /> Verify TrueNAS SSL</label>
                     <label><input type="checkbox" name="allow_destructive" /> Allow destructive actions</label>
                     <label><input type="checkbox" name="proxmox_demo_mode" /> <strong>Demo Mode</strong></label>
                   </div>
                   <div class="field full form-actions">
                     <button type="submit" class="btn btn-primary">Save Settings</button>
                     <button type="button" class="btn btn-ghost" id="btn-test-conn">⚡ Test Proxmox</button>
+                    <button type="button" class="btn btn-ghost" id="btn-test-truenas">⚡ Test TrueNAS</button>
                   </div>
                 </form>
                 <div id="test-conn-result" class="test-result hidden"></div>
@@ -986,7 +1022,7 @@
 
             <div class="card">
               <div class="card-header">
-                <h2>Exposed MCP Tool Catalog (<span id="mcp-tool-count">44</span> Tools)</h2>
+                <h2>Exposed MCP Tool Catalog (<span id="mcp-tool-count">45</span> Tools)</h2>
               </div>
               <div id="mcp-tools-grid" class="tools-grid"></div>
             </div>

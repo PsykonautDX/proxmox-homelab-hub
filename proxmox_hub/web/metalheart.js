@@ -518,11 +518,451 @@ export function initMetalheart(ctx) {
       </div>`;
   }
 
-  /* ── 8. Command Overview High-Signal Widgets (Service Pulse + iDRAC Mini-HUD) ── */
+  /* ── 7b. Bare-Metal TrueNAS Host Monitoring (Strictly Read-Only) ────── */
+  let tnDatasetPoolFilter = "";
+
+  function renderTrueNasMini(tnRes) {
+    const miniEl = $("#cmd-truenas-mini");
+    const subEl = $("#cmd-truenas-sub");
+    const pillEl = $("#cmd-truenas-pill");
+    const openBtn = $("#btn-cmd-truenas-open");
+    if (!miniEl) return;
+
+    if (!tnRes || !tnRes.configured) {
+      if (pillEl) pillEl.classList.add("hidden");
+      if (openBtn) openBtn.classList.add("hidden");
+      if (subEl) subEl.textContent = "Connect your bare-metal TrueNAS host for live read-only ZFS & disk health";
+      miniEl.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:6px 0;">
+          <span class="muted small">${esc(tnRes?.message || "Optional: add TrueNAS host URL & API key in System → MCP & Settings.")}</span>
+          <button class="btn btn-xs btn-primary" id="btn-cmd-tn-setup">Configure TrueNAS →</button>
+        </div>`;
+      $("#btn-cmd-tn-setup")?.addEventListener("click", () => navigate("system", "settings"));
+      return;
+    }
+
+    if (!tnRes.connected) {
+      if (pillEl) {
+        pillEl.className = "status-pill err";
+        pillEl.textContent = "UNREACHABLE";
+      }
+      if (openBtn && tnRes.url) {
+        openBtn.href = tnRes.url;
+        openBtn.classList.remove("hidden");
+      }
+      miniEl.innerHTML = `<div class="test-result err" style="margin:4px 0;">${esc(tnRes.error || "Unable to reach TrueNAS.")}</div>`;
+      return;
+    }
+
+    const sys = tnRes.system || {};
+    const sum = tnRes.summary || {};
+    const pools = tnRes.pools || [];
+    const degraded = sum.pools_degraded > 0;
+
+    if (pillEl) {
+      pillEl.className = `status-pill ${degraded || sum.critical_alerts > 0 ? "err" : sum.warning_alerts > 0 ? "warn" : "ok"}`;
+      pillEl.textContent = degraded
+        ? `${sum.pools_degraded} POOL DEGRADED`
+        : sum.active_alerts > 0
+          ? `${sum.active_alerts} ALERT${sum.active_alerts === 1 ? "" : "S"}`
+          : "ALL POOLS ONLINE";
+    }
+    if (openBtn && tnRes.url) {
+      openBtn.href = tnRes.url;
+      openBtn.classList.remove("hidden");
+    }
+    if (subEl) {
+      const mem = sys.memory || {};
+      const arcTxt = mem.zfs_arc ? ` · ARC ${fmtBytes(mem.zfs_arc)}` : "";
+      subEl.textContent = `${sys.hostname || "TrueNAS"} · ${sys.version || ""} · ${fmtBytes(sum.used_bytes)} / ${fmtBytes(sum.total_bytes)} (${sum.used_pct}%)${arcTxt}`;
+    }
+
+    miniEl.innerHTML = pools.length
+      ? `<div class="storage-grid" style="grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;">
+          ${pools
+            .map((p) => {
+              const isOk = p.status === "ONLINE" && p.healthy;
+              const fillCls = !isOk || p.used_pct >= 90 ? "crit" : p.used_pct >= 80 ? "warn" : "ok";
+              return `
+              <div class="storage-card" style="padding:10px 12px;cursor:pointer;" data-cmd-tn-jump="1">
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:5px;">
+                  <strong class="mono">${esc(p.name)}</strong>
+                  <span class="status-pill ${isOk ? "ok" : "err"}" style="padding:1px 7px;font-size:10px;">${esc(p.status)}</span>
+                </div>
+                <div class="mono small" style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                  <span>${fmtBytes(p.allocated)} / ${fmtBytes(p.size)}</span>
+                  <strong>${p.used_pct}%</strong>
+                </div>
+                <div class="bar-track" style="height:6px;margin-bottom:6px;"><div class="bar-fill ${fillCls}" style="width:${Math.min(100, p.used_pct)}%"></div></div>
+                <div class="muted small mono" style="display:flex;justify-content:space-between;gap:6px;">
+                  <span style="color:${p.disks_with_errors ? "var(--rose)" : "inherit"}">${p.disks_with_errors ? `⚠ ${p.disks_with_errors}/${p.disks_total} disk err` : `${p.disks_total} disks OK`}</span>
+                  <span>${p.vdev_summary ? esc(p.vdev_summary) : "ZFS"}</span>
+                </div>
+              </div>`;
+            })
+            .join("")}
+        </div>`
+      : `<div class="muted small">Connected to ${esc(sys.hostname || "TrueNAS")} — no ZFS pools reported.</div>`;
+
+    $$("[data-cmd-tn-jump]").forEach((el) =>
+      el.addEventListener("click", () => navigate("storage", "truenas"))
+    );
+  }
+
+  async function loadTrueNAS(forceRefresh = false) {
+    const wrap = $("#truenas-wrap");
+    if (!wrap) return;
+    wrap.innerHTML = `<div class="card"><div class="muted small" style="padding:24px;text-align:center;">Querying bare-metal TrueNAS host (read-only)...</div></div>`;
+
+    const data = await api(`/api/storage/truenas${forceRefresh ? "?refresh=true" : ""}`);
+    if (!data.configured) {
+      wrap.innerHTML = `
+        <div class="card" style="text-align:center;padding:34px;">
+          <h2>Bare-Metal TrueNAS Monitoring (Read-Only)</h2>
+          <p class="muted" style="max-width:600px;margin:8px auto 14px;">${esc(data.message)}</p>
+          <div class="muted small" style="max-width:560px;margin:0 auto 18px;text-align:left;background:var(--surface-2);padding:12px 14px;border:1px solid var(--border);border-radius:8px;">
+            <strong>Quick Setup (TrueNAS SCALE 25.10 Goldeye / 25.04+ / CORE):</strong><br/>
+            1. In TrueNAS WebUI, click the top-right <strong>User icon → API Keys → Add</strong>.<br/>
+            2. Copy the generated key and paste your TrueNAS URL (e.g. <code>https://your-truenas-ip</code>) &amp; key into <strong>06 System → MCP &amp; Settings</strong>.<br/>
+            3. Click <strong>Save Settings</strong> → <strong>⚡ Test TrueNAS</strong>. Only read-only queries are ever executed.
+          </div>
+          <button class="btn btn-primary" id="btn-tn-goto-settings">Configure TrueNAS in Settings →</button>
+        </div>`;
+      $("#btn-tn-goto-settings")?.addEventListener("click", () => navigate("system", "settings"));
+      return;
+    }
+
+    if (!data.connected) {
+      wrap.innerHTML = `
+        <div class="card">
+          <div class="card-header">
+            <h2>Bare-Metal TrueNAS Connection Error</h2>
+            <div style="display:flex;gap:6px;">
+              <button class="btn btn-xs" id="btn-tn-retry">↻ Retry</button>
+              <button class="btn btn-xs btn-primary" id="btn-tn-fix-settings">Settings →</button>
+            </div>
+          </div>
+          <div class="test-result err">${esc(data.error || "Unable to connect to TrueNAS.")}</div>
+        </div>`;
+      $("#btn-tn-retry")?.addEventListener("click", () => loadTrueNAS(true));
+      $("#btn-tn-fix-settings")?.addEventListener("click", () => navigate("system", "settings"));
+      return;
+    }
+
+    const sys = data.system || {};
+    const mem = sys.memory || {};
+    const sum = data.summary || {};
+    const pools = data.pools || [];
+    const disks = data.disks || [];
+    const shares = data.shares || [];
+    const services = data.services || [];
+    const alerts = data.alerts || [];
+    const links = data.proxmox_links || [];
+    const allDatasets = data.datasets || [];
+
+    const poolNames = [...new Set(pools.map((p) => p.name))];
+    if (tnDatasetPoolFilter && !poolNames.includes(tnDatasetPoolFilter)) tnDatasetPoolFilter = "";
+
+    const healthyPct = sum.pools_total ? Math.round((sum.pools_online / sum.pools_total) * 100) : 100;
+    const memSubParts = [];
+    if (mem.zfs_arc) memSubParts.push(`ARC ${fmtBytes(mem.zfs_arc)}`);
+    if (mem.services) memSubParts.push(`Svc ${fmtBytes(mem.services)}`);
+    if (mem.free) memSubParts.push(`Free ${fmtBytes(mem.free)}`);
+    const loadStr = (sys.loadavg || []).length ? `Load ${(sys.loadavg || []).map((x) => Number(x).toFixed(2)).join(" / ")}` : "";
+
+    wrap.innerHTML = `
+      <div class="card" style="margin-bottom:14px;">
+        <div class="card-header" style="margin-bottom:8px;">
+          <div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <h2>${esc(sys.hostname || "TrueNAS")}</h2>
+              <span class="tag tag-cyan mono">${esc(sys.version || "TrueNAS")}</span>
+              <span class="tag tag-emerald">READ-ONLY</span>
+              <span class="tag mono">${esc((data.transport || "ws").toUpperCase())}</span>
+              ${sys.ecc_memory ? '<span class="tag tag-violet">ECC RAM</span>' : ""}
+            </div>
+            <p class="muted small mono" style="margin-top:4px;">
+              ${esc(sys.cpu_model || "CPU")} (${sys.cores || "?"} threads) · Up ${esc(sys.uptime || "—")} ${loadStr ? `· ${esc(loadStr)}` : ""}
+            </p>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            ${data.url ? `<a class="btn btn-xs" href="${esc(data.url)}" target="_blank" rel="noopener">↗ Open TrueNAS UI</a>` : ""}
+            <button class="btn btn-xs btn-primary" id="btn-tn-refresh">↻ Refresh</button>
+          </div>
+        </div>
+        ${
+          services.length
+            ? `<div class="tag-row" style="gap:6px;">
+                ${services
+                  .map(
+                    (sv) =>
+                      `<span class="tag ${sv.state === "RUNNING" ? "tag-emerald" : ""}" title="${sv.enable ? "Enabled on boot" : "Manual"}">${esc(sv.service.toUpperCase())}: ${esc(sv.state)}</span>`
+                  )
+                  .join("")}
+              </div>`
+            : ""
+        }
+      </div>
+
+      <div class="kpi-grid" style="margin-bottom:14px;">
+        <div class="kpi-card">
+          <div>
+            <div class="kpi-label">ZFS Pools Health</div>
+            <div class="kpi-value" style="color:${sum.pools_degraded ? "var(--rose)" : "var(--emerald)"}">${sum.pools_online} / ${sum.pools_total}</div>
+            <div class="kpi-sub">${sum.pools_degraded ? `${sum.pools_degraded} pool(s) degraded` : "All pools ONLINE"}</div>
+          </div>
+          ${renderRingGauge(healthyPct, sum.pools_degraded ? "#fb5678" : "#2ee6a6")}
+        </div>
+        <div class="kpi-card">
+          <div>
+            <div class="kpi-label">Usable Storage</div>
+            <div class="kpi-value">${fmtBytes(sum.used_bytes)}</div>
+            <div class="kpi-sub">of ${fmtBytes(sum.total_bytes)} · ${fmtBytes(sum.free_bytes)} free</div>
+          </div>
+          ${renderRingGauge(sum.used_pct, sum.used_pct >= 90 ? "#fb5678" : sum.used_pct >= 80 ? "#fbbf24" : "#38e8ff")}
+        </div>
+        <div class="kpi-card">
+          <div>
+            <div class="kpi-label">Memory &amp; ZFS ARC</div>
+            <div class="kpi-value">${fmtBytes(mem.total || sys.physmem)}</div>
+            <div class="kpi-sub">${memSubParts.length ? esc(memSubParts.join(" · ")) : (sys.cpu_usage_pct != null ? `CPU ${sys.cpu_usage_pct}%` : "Physical RAM")}</div>
+          </div>
+          ${renderRingGauge(mem.used_pct ?? (sys.cpu_usage_pct ?? 0), "#c4b5fd")}
+        </div>
+        <div class="kpi-card">
+          <div>
+            <div class="kpi-label">Disks &amp; Alerts</div>
+            <div class="kpi-value" style="color:${sum.disks_with_errors || sum.critical_alerts ? "var(--rose)" : "var(--text-strong)"}">${sum.active_alerts} alerts</div>
+            <div class="kpi-sub">${sum.disks_total} disks · ${sum.disks_with_errors} with errors${sum.max_disk_temp != null ? ` · max ${sum.max_disk_temp}°C` : ""}</div>
+          </div>
+          ${renderRingGauge(sum.disks_total ? Math.max(0, 100 - (sum.disks_with_errors / sum.disks_total) * 100) : 100, sum.disks_with_errors ? "#fb5678" : "#2ee6a6")}
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:14px;">
+        <div class="card-header">
+          <h2>ZFS Storage Pools (${pools.length})</h2>
+          <span class="muted small">Usable capacity, vdev topology, disk errors &amp; last scrub</span>
+        </div>
+        <div class="storage-grid">
+          ${pools
+            .map((p) => {
+              const isOk = p.status === "ONLINE" && p.healthy;
+              const fillCls = !isOk || p.used_pct >= 90 ? "crit" : p.used_pct >= 80 ? "warn" : "ok";
+              const scrub = p.last_scrub || {};
+              const errList = (p.errored_disks || [])
+                .map((d) => `${d.name} (${d.status}: R:${d.read_errors} W:${d.write_errors} C:${d.checksum_errors})`)
+                .join(", ");
+              return `
+              <div class="storage-card">
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;">
+                  <div>
+                    <strong class="mono" style="font-size:14px;">${esc(p.name)}</strong>
+                    ${p.vdev_summary ? `<span class="tag" style="margin-left:6px;">${esc(p.vdev_summary)}</span>` : ""}
+                  </div>
+                  <span class="status-pill ${isOk ? "ok" : "err"}">${esc(p.status)}</span>
+                </div>
+                <div class="mono small" style="display:flex;justify-content:space-between;margin-bottom:5px;">
+                  <span>${fmtBytes(p.allocated)} / ${fmtBytes(p.size)} (${fmtBytes(p.free)} free)</span>
+                  <strong>${p.used_pct}%</strong>
+                </div>
+                <div class="bar-track" style="margin-bottom:8px;"><div class="bar-fill ${fillCls}" style="width:${Math.min(100, p.used_pct)}%"></div></div>
+                <div class="muted small mono" style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+                  <span style="color:${p.disks_with_errors ? "var(--rose)" : "var(--emerald)"}">
+                    Disks w/ Errors: <strong>${p.disks_with_errors} of ${p.disks_total}</strong>
+                  </span>
+                  <span>Frag: ${p.fragmentation != null ? `${p.fragmentation}%` : "—"}</span>
+                  <span>Scrub: ${esc(scrub.state || "—")}${scrub.end_time ? ` (${fmtTime(scrub.end_time)})` : ""}${scrub.errors ? ` · ${scrub.errors} err` : ""}</span>
+                </div>
+                ${errList ? `<div class="finding critical" style="margin-top:8px;padding:7px 9px;"><div class="mono small">${esc(errList)}</div></div>` : ""}
+              </div>`;
+            })
+            .join("")}
+        </div>
+      </div>
+
+      <div class="two-col" style="margin-bottom:14px;">
+        <div class="card">
+          <div class="card-header">
+            <h2>Active TrueNAS Alerts (${alerts.length})</h2>
+            <span class="muted small">${sum.critical_alerts} critical · ${sum.warning_alerts} warning</span>
+          </div>
+          <div class="findings-list" style="max-height:300px;overflow:auto;">
+            ${
+              alerts.length
+                ? alerts
+                    .map((a) => {
+                      const cls = ["CRITICAL", "ALERT", "EMERGENCY", "ERROR"].includes(a.level)
+                        ? "critical"
+                        : a.level === "WARNING"
+                          ? "warning"
+                          : "info";
+                      return `
+                      <div class="finding ${cls}">
+                        <div class="finding-title">[${esc(a.level)}] ${esc(a.klass || "System Alert")}</div>
+                        <div class="finding-detail">${esc(a.message)}</div>
+                        ${a.timestamp ? `<div class="muted small mono" style="margin-top:3px;">${fmtTime(a.timestamp)}</div>` : ""}
+                      </div>`;
+                    })
+                    .join("")
+                : `<div class="finding"><div class="finding-title">Zero active TrueNAS alerts</div><div class="finding-detail">No pending warnings or critical alerts on ${esc(sys.hostname || "TrueNAS")}.</div></div>`
+            }
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h2>Shares &amp; Proxmox Storage Links (${shares.length})</h2>
+            <span class="muted small">${links.length} mounted in Proxmox</span>
+          </div>
+          ${
+            links.length
+              ? `<div style="margin-bottom:10px;">
+                  <div class="muted small" style="margin-bottom:5px;">MOUNTED IN PROXMOX DATACENTER</div>
+                  <div class="mini-list">
+                    ${links
+                      .map(
+                        (lk) => `
+                      <div class="list-row">
+                        <div>
+                          <span class="tag tag-cyan mono">${esc(lk.proxmox_storage)}</span>
+                          <span class="tag">${esc(lk.type.toUpperCase())}</span>
+                          <span class="mono small" style="margin-left:6px;">${esc(lk.export)}</span>
+                        </div>
+                        <span class="muted small mono">${esc(lk.content)}</span>
+                      </div>`
+                      )
+                      .join("")}
+                  </div>
+                </div>`
+              : ""
+          }
+          <div class="mini-list" style="max-height:240px;overflow:auto;">
+            ${
+              shares.length
+                ? shares
+                    .map(
+                      (sh) => `
+                    <div class="list-row">
+                      <div style="min-width:0;">
+                        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                          <span class="tag ${sh.protocol === "NFS" ? "tag-cyan" : sh.protocol === "SMB" ? "tag-violet" : "tag-amber"}">${esc(sh.protocol)}</span>
+                          <strong class="mono small">${esc(sh.name)}</strong>
+                          ${sh.readonly ? '<span class="tag">RO</span>' : ""}
+                          ${!sh.enabled ? '<span class="tag tag-rose">DISABLED</span>' : ""}
+                        </div>
+                        <div class="muted small mono">${esc(sh.path)}${sh.comment ? ` · ${esc(sh.comment)}` : ""}</div>
+                      </div>
+                    </div>`
+                    )
+                    .join("")
+                : `<div class="muted small">No NFS, SMB, or iSCSI shares configured.</div>`
+            }
+          </div>
+        </div>
+      </div>
+
+      <div class="card table-card" style="margin-bottom:14px;">
+        <div class="card-header" style="padding:14px 18px 8px;">
+          <h2>Physical Disks, Temperatures &amp; ZFS Errors (${disks.length})</h2>
+          <span class="muted small">Sorted with errored drives first</span>
+        </div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Disk</th>
+              <th>Pool</th>
+              <th>Model &amp; Serial</th>
+              <th>Size</th>
+              <th>Temp</th>
+              <th>ZFS State &amp; Errors (R/W/C)</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${
+              disks.length
+                ? disks
+                    .map((d) => {
+                      const errSum = (d.read_errors || 0) + (d.write_errors || 0) + (d.checksum_errors || 0);
+                      const hasErr = errSum > 0 || (d.zfs_status !== "ONLINE" && d.zfs_status !== "UNUSED");
+                      const tempCls = d.temperature >= 55 ? "crit" : d.temperature >= 48 ? "warn" : "ok";
+                      return `
+                      <tr>
+                        <td class="mono"><strong>${esc(d.name)}</strong> <span class="tag">${esc(d.type)}</span></td>
+                        <td class="mono small">${d.pool ? `<span class="tag tag-cyan">${esc(d.pool)}</span>` : '<span class="muted">—</span>'}</td>
+                        <td><div>${esc(d.model)}</div><div class="muted small mono">${esc(d.serial || "—")}</div></td>
+                        <td class="mono small">${fmtBytes(d.size)}</td>
+                        <td class="mono small">
+                          ${
+                            d.temperature != null
+                              ? `<div class="bar-wrap" style="min-width:74px;"><div>${d.temperature}°C</div><div class="bar-track" style="height:5px;"><div class="bar-fill ${tempCls}" style="width:${Math.min(100, d.temperature)}%"></div></div></div>`
+                              : '<span class="muted">—</span>'
+                          }
+                        </td>
+                        <td class="mono small">
+                          <span class="status-pill ${hasErr ? "err" : d.pool ? "ok" : "subtle"}">${esc(d.zfs_status)}</span>
+                          ${errSum > 0 ? `<span style="color:var(--rose);margin-left:6px;">${d.read_errors}/${d.write_errors}/${d.checksum_errors}</span>` : ""}
+                        </td>
+                      </tr>`;
+                    })
+                    .join("")
+                : `<tr><td colspan="6" class="muted" style="text-align:center;padding:20px;">No disks reported.</td></tr>`
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card table-card">
+        <div class="card-header" style="padding:14px 18px 8px;">
+          <h2>ZFS Datasets (${allDatasets.length})</h2>
+          <select id="tn-ds-pool-filter" class="input mono" style="max-width:200px;">
+            <option value="">All Pools</option>
+            ${poolNames.map((pn) => `<option value="${esc(pn)}" ${tnDatasetPoolFilter === pn ? "selected" : ""}>${esc(pn)}</option>`).join("")}
+          </select>
+        </div>
+        <table class="data-table">
+          <thead><tr><th>Dataset</th><th>Mountpoint</th><th>Used</th><th>Available</th><th>Compression</th></tr></thead>
+          <tbody id="tn-datasets-tbody"></tbody>
+        </table>
+      </div>`;
+
+    const renderDatasets = () => {
+      const filtered = tnDatasetPoolFilter
+        ? allDatasets.filter((ds) => ds.pool === tnDatasetPoolFilter)
+        : allDatasets;
+      $("#tn-datasets-tbody").innerHTML = filtered.length
+        ? filtered
+            .map(
+              (ds) => `
+            <tr>
+              <td class="mono small"><strong>${esc(ds.id)}</strong></td>
+              <td class="mono small muted">${esc(ds.mountpoint || "—")}</td>
+              <td class="mono small">${fmtBytes(ds.used)}</td>
+              <td class="mono small">${fmtBytes(ds.available)}</td>
+              <td class="mono small">${esc(ds.compression || "—")} ${ds.compressratio ? `(${esc(ds.compressratio)})` : ""}</td>
+            </tr>`
+            )
+            .join("")
+        : `<tr><td colspan="5" class="muted" style="text-align:center;padding:18px;">No matching datasets.</td></tr>`;
+    };
+    renderDatasets();
+
+    $("#tn-ds-pool-filter")?.addEventListener("change", (e) => {
+      tnDatasetPoolFilter = e.target.value;
+      renderDatasets();
+    });
+    $("#btn-tn-refresh")?.addEventListener("click", () => {
+      playChime("click");
+      loadTrueNAS(true);
+    });
+  }
+
+  /* ── 8. Command Overview High-Signal Widgets (Service Pulse + iDRAC + TrueNAS Mini-HUD) ── */
   async function loadCommandWidgets(runFreshProbe = false) {
-    const [upRes, hwRes] = await Promise.all([
+    const [upRes, hwRes, tnRes] = await Promise.all([
       api(runFreshProbe ? "/api/uptime/probe" : "/api/uptime", { method: runFreshProbe ? "POST" : "GET" }).catch(() => null),
       api("/api/hardware/idrac").catch(() => null),
+      api("/api/storage/truenas").catch(() => null),
     ]);
 
     // 1. Live Service Pulse & Quick Launch
@@ -593,6 +1033,9 @@ export function initMetalheart(ctx) {
           </div>`;
       }
     }
+
+    // 3. Bare-Metal TrueNAS Storage Mini-HUD
+    renderTrueNasMini(tnRes);
   }
 
   $("#btn-cmd-probe")?.addEventListener("click", async () => {
@@ -603,6 +1046,7 @@ export function initMetalheart(ctx) {
   });
   $("#btn-cmd-uptime-all")?.addEventListener("click", () => navigate("fleet", "uptime"));
   $("#btn-cmd-idrac-all")?.addEventListener("click", () => navigate("system", "hardware"));
+  $("#btn-cmd-truenas-all")?.addEventListener("click", () => navigate("storage", "truenas"));
 
   return {
     playChime,
@@ -613,5 +1057,6 @@ export function initMetalheart(ctx) {
     loadCheckpoints,
     loadWol,
     loadHardwareIdrac,
+    loadTrueNAS,
   };
 }

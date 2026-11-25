@@ -318,6 +318,29 @@ async def test_full_demo_webui_rest_lifecycle(tmp_path):
             assert hw_res.status_code == 200
             assert hw_res.json()["power"]["watts_now"] > 0
 
+            # 9b. Bare-Metal TrueNAS Read-Only Monitoring & Connection Test
+            tn_res = await client.get("/api/storage/truenas")
+            assert tn_res.status_code == 200
+            tn_data = tn_res.json()
+            assert tn_data["connected"] is True
+            assert tn_data["read_only"] is True
+            assert tn_data["summary"]["pools_total"] >= 2
+            assert tn_data["summary"]["pools_degraded"] >= 1
+            assert len(tn_data["disks"]) >= 4
+            assert len(tn_data["shares"]) >= 2
+
+            tn_test = await client.post("/api/settings/test-truenas")
+            assert tn_test.status_code == 200
+            assert tn_test.json()["ok"] is True
+            assert tn_test.json()["pools_total"] >= 2
+
+            # Verify TrueNAS degraded pool feeds into Actionable Homelab Doctor when configured
+            app.state.service.settings.truenas_host = "https://truenas.lab.local"
+            app.state.service.settings.truenas_api_key = "1-demo-test-key"
+            hr_tn = (await client.get("/api/health-report")).json()
+            assert hr_tn["stats"]["truenas_pools_checked"] >= 2
+            assert any(f["category"] == "truenas" and f["action_kind"] == "truenas" for f in hr_tn["findings"])
+
             wol_add = await client.post(
                 "/api/wol/devices",
                 json={"name": "Test-NAS", "mac": "AA:BB:CC:DD:EE:FF", "ip": "192.168.1.240"},
@@ -353,7 +376,7 @@ async def test_mcp_server_tools_resources_prompts_and_http(tmp_path):
     tool_names = {t.name for t in tools}
     catalog_names = {t["name"] for t in MCP_TOOL_CATALOG}
     assert tool_names == catalog_names
-    assert len(tools) == 44
+    assert len(tools) == 45
 
     resources = await mcp.list_resources()
     assert len(resources) == 3
@@ -370,6 +393,12 @@ async def test_mcp_server_tools_resources_prompts_and_http(tmp_path):
     ov_text = ov_res[0].text if isinstance(ov_res, list) else ov_res.content[0].text
     ov_json = json.loads(ov_text)
     assert ov_json["summary"]["nodes_online"] == 1
+
+    tn_res = await mcp.call_tool("get_truenas_overview", {})
+    tn_text = tn_res[0].text if isinstance(tn_res, list) else tn_res.content[0].text
+    tn_json = json.loads(tn_text)
+    assert tn_json["read_only"] is True
+    assert tn_json["summary"]["pools_total"] >= 2
 
     # Destructive tool must enforce safety guardrail
     with pytest.raises((SafetyPolicyError, Exception)):

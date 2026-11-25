@@ -38,6 +38,9 @@ class SettingsUpdateRequest(BaseModel):
     idrac_password: str | None = Field(default=None)
     electricity_rate_kwh: float = Field(default=0.26, ge=0.0, le=10.0)
     currency_symbol: str = Field(default="£")
+    truenas_host: str = Field(default="")
+    truenas_api_key: str | None = Field(default=None)
+    truenas_verify_ssl: bool = Field(default=False)
 
 
 class PowerActionRequest(BaseModel):
@@ -323,6 +326,11 @@ def create_app(settings: AppSettings | None = None) -> FastAPI:
             if payload.idrac_password is not None and payload.idrac_password.strip() != ""
             else service.settings.idrac_password
         )
+        tn_key = (
+            payload.truenas_api_key.strip()
+            if payload.truenas_api_key is not None and payload.truenas_api_key.strip() != ""
+            else service.settings.truenas_api_key
+        )
         updated = AppSettings(
             proxmox_host=payload.proxmox_host,
             proxmox_token_id=payload.proxmox_token_id,
@@ -342,6 +350,9 @@ def create_app(settings: AppSettings | None = None) -> FastAPI:
             idrac_password=idrac_pw,
             electricity_rate_kwh=payload.electricity_rate_kwh,
             currency_symbol=payload.currency_symbol,
+            truenas_host=payload.truenas_host,
+            truenas_api_key=tn_key,
+            truenas_verify_ssl=payload.truenas_verify_ssl,
         )
         await service.reload_settings(updated, persist=True)
         service.audit.record(
@@ -763,6 +774,15 @@ def create_app(settings: AppSettings | None = None) -> FastAPI:
     @app.get("/api/hardware/idrac")
     async def get_hardware_idrac():
         return await service.get_hardware_telemetry(source="webui")
+
+    # ── Bare-Metal TrueNAS Host Telemetry (Read-Only) ────────────────────
+    @app.get("/api/storage/truenas")
+    async def get_storage_truenas(refresh: bool = Query(False)):
+        return await service.get_truenas_telemetry(force_refresh=refresh, source="webui")
+
+    @app.post("/api/settings/test-truenas")
+    async def test_truenas_settings():
+        return await service.test_truenas_connection()
 
     # ── Wake-on-LAN Portal ───────────────────────────────────────────────
     @app.get("/api/wol/devices")

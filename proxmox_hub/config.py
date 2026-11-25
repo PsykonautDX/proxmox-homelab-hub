@@ -40,6 +40,15 @@ class AppSettings(BaseModel):
     electricity_rate_kwh: float = Field(default=0.26)
     currency_symbol: str = Field(default="£")
 
+    # Optional TrueNAS Host (read-only monitoring via JSON-RPC 2.0 WebSocket / REST v2 fallback)
+    truenas_host: str = Field(default="")
+    truenas_api_key: str = Field(default="")
+    truenas_verify_ssl: bool = Field(default=False)
+
+    @property
+    def truenas_configured(self) -> bool:
+        return bool(self.truenas_host.strip() and self.truenas_api_key.strip())
+
     @property
     def is_configured(self) -> bool:
         return bool(
@@ -63,6 +72,13 @@ class AppSettings(BaseModel):
                 masked = "•" * len(secret)
             else:
                 masked = f"{secret[:4]}{'•' * (len(secret) - 8)}{secret[-4:]}"
+        tn_key = self.truenas_api_key
+        tn_masked = ""
+        if tn_key:
+            if len(tn_key) <= 8:
+                tn_masked = "•" * len(tn_key)
+            else:
+                tn_masked = f"{tn_key[:4]}{'•' * min(12, len(tn_key) - 8)}{tn_key[-4:]}"
         return {
             "proxmox_host": self.normalized_host,
             "proxmox_token_id": self.proxmox_token_id,
@@ -84,6 +100,11 @@ class AppSettings(BaseModel):
             "has_idrac_password": bool(self.idrac_password),
             "electricity_rate_kwh": self.electricity_rate_kwh,
             "currency_symbol": self.currency_symbol,
+            "truenas_host": self.truenas_host,
+            "truenas_api_key_masked": tn_masked,
+            "has_truenas_api_key": bool(tn_key),
+            "truenas_verify_ssl": self.truenas_verify_ssl,
+            "truenas_configured": self.truenas_configured,
         }
 
 
@@ -161,6 +182,9 @@ def load_settings(env_path: Path | None = None) -> AppSettings:
         idrac_password=get("IDRAC_PASSWORD", ""),
         electricity_rate_kwh=elec_rate,
         currency_symbol=get("CURRENCY_SYMBOL", "£"),
+        truenas_host=get("TRUENAS_HOST", ""),
+        truenas_api_key=get("TRUENAS_API_KEY", ""),
+        truenas_verify_ssl=_parse_bool(get("TRUENAS_VERIFY_SSL", "false"), False),
     )
 
 
@@ -199,6 +223,11 @@ def save_settings(settings: AppSettings, env_path: Path | None = None) -> None:
         f"ELECTRICITY_RATE_KWH={settings.electricity_rate_kwh}",
         f"CURRENCY_SYMBOL={settings.currency_symbol}",
         "",
+        "# Optional Bare-Metal TrueNAS Host (Read-Only Monitoring)",
+        f"TRUENAS_HOST={settings.truenas_host.strip()}",
+        f"TRUENAS_API_KEY={settings.truenas_api_key.strip()}",
+        f"TRUENAS_VERIFY_SSL={'true' if settings.truenas_verify_ssl else 'false'}",
+        "",
     ]
     resolved_env.write_text("\n".join(lines), encoding="utf-8")
 
@@ -219,3 +248,6 @@ def save_settings(settings: AppSettings, env_path: Path | None = None) -> None:
     os.environ["IDRAC_PASSWORD"] = settings.idrac_password.strip()
     os.environ["ELECTRICITY_RATE_KWH"] = str(settings.electricity_rate_kwh)
     os.environ["CURRENCY_SYMBOL"] = settings.currency_symbol.strip()
+    os.environ["TRUENAS_HOST"] = settings.truenas_host.strip()
+    os.environ["TRUENAS_API_KEY"] = settings.truenas_api_key.strip()
+    os.environ["TRUENAS_VERIFY_SSL"] = "true" if settings.truenas_verify_ssl else "false"

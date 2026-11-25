@@ -54,6 +54,7 @@ MCP_TOOL_CATALOG: list[dict[str, str]] = [
     {"name": "send_wake_on_lan", "category": "Network", "risk": "write", "summary": "Send a UDP Wake-on-LAN Magic Packet to power on a physical device on your LAN."},
     {"name": "list_all_snapshots", "category": "Snapshots", "risk": "read", "summary": "Audit all snapshots across every VM and LXC in the cluster plus available tag groups for checkpoints."},
     {"name": "create_group_checkpoint", "category": "Snapshots", "risk": "write", "summary": "Snapshot every VM/LXC matching a tag (e.g. 'arr', 'ai', 'docker') with a unified pre-maintenance checkpoint."},
+    {"name": "get_truenas_overview", "category": "Storage", "risk": "read", "summary": "Read-only bare-metal TrueNAS telemetry: system/ECC RAM/ARC, ZFS pools & disk errors, temperatures, datasets, NFS/SMB/iSCSI shares, services, and active alerts."},
 ]
 
 
@@ -656,6 +657,11 @@ def create_mcp_server(service: ProxmoxService) -> MCPServer:
     async def create_group_checkpoint(tag: str, snapname: str | None = None) -> str:
         """Create a pre-maintenance snapshot checkpoint across all VMs/LXCs sharing a tag (e.g. 'arr', 'ai', 'docker')."""
         return _json(await service.create_group_checkpoint(tag=tag, snapname=snapname, source="mcp"))
+
+    @mcp.tool()
+    async def get_truenas_overview(force_refresh: bool = False) -> str:
+        """Read-only TrueNAS SCALE/CORE monitoring: hostname, version, ECC memory & ZFS ARC, ZFS pool health & disk errors, drive temps, datasets, NFS/SMB/iSCSI shares, services, active alerts, and matched Proxmox storages."""
+        return _json(await service.get_truenas_telemetry(force_refresh=force_refresh, source="mcp"))
 
     # ── MCP Resources ────────────────────────────────────────────────────
     @mcp.resource("proxmox://cluster/overview")

@@ -65,11 +65,11 @@ After deploying, open **`http://<your-docker-host-ip>:8806`** and configure your
 - **Homelab Health Advisor**: Automated health score (`0–100`) checking host CPU/RAM pressure, storage pools exceeding 80%/90%, physical disk SMART health & SSD wearout, recent failed tasks, and backup schedule coverage.
 - **VMs & LXC Containers**: Search & filter by type, state, or tags; inline CPU/RAM bars; quick Start/Shutdown/Reboot; and a slide-over **Guest Inspector** with live RRD charts, CPU/RAM/tag/onboot editor, Snapshot manager, on-demand VZDump backups, cloning, and safety-gated deletion.
 - **Provisioning Studio & Community Scripts**: Guided QEMU VM & LXC creation presets, auto-discovered next VMID/storages/ISOs/templates, and live Proxmox Community Scripts browser.
-- **Storage, Disks, Backups, Docker & Hardware**: Pool utilization, SMART health, ZFS overview, ISO/template hub, service uptime monitor, Docker container inspection, optional Dell iDRAC Redfish telemetry, and Wake-on-LAN.
+- **Storage, Disks, Backups, Docker & Hardware**: Pool utilization, SMART health, ZFS overview, ISO/template hub, service uptime monitor, Docker container inspection, optional bare-metal TrueNAS SCALE/CORE read-only monitoring (JSON-RPC 2.0 WebSocket + REST v2 fallback for ZFS pools, disk errors/temps, ARC, shares & alerts), Dell iDRAC Redfish telemetry, and Wake-on-LAN.
 - **Interactive Demo Mode**: Preview every dashboard and MCP tool with realistic simulated homelab data before adding an API token.
 
 ### 2. Dual-Transport MCP Server (`stdio` + Streamable HTTP `/mcp`)
-- **44 Typed Tools** across Monitoring, Guests, Provisioning, Snapshots, Backups, Storage/SMART, Community Scripts, Uptime, Docker, iDRAC, Wake-on-LAN, Health Diagnostics, and Audit.
+- **45 Typed Tools** across Monitoring, Guests, Provisioning, Snapshots, Backups, Storage/SMART, Community Scripts, Uptime, Docker, iDRAC, TrueNAS (read-only), Wake-on-LAN, Health Diagnostics, and Audit.
 - **Safety Guardrails (`SAFETY_MODE`)**:
   - `read_only`: Blocks all mutating actions.
   - `safe` *(default)*: Allows monitoring, power controls, VM/LXC creation, snapshots, and backups; blocks destructive delete/rollback unless `ALLOW_DESTRUCTIVE=true`.

@@ -7,7 +7,7 @@ import base64
 import shlex
 import time
 from typing import Any
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 
 import httpx
 
@@ -18,6 +18,7 @@ from .config import AppSettings, load_settings, save_settings
 from .demo_provider import DemoProxmoxClient
 from .docker_manager import discover_docker_containers, run_docker_container_op
 from .hardware_monitor import fetch_idrac_telemetry
+from .truenas_client import fetch_truenas_telemetry, test_truenas_connection as probe_truenas_connection
 from .insights import (
     detect_service_url,
     extract_agent_ips,
@@ -54,6 +55,7 @@ class ProxmoxService:
         self._live_client = ProxmoxClient(self.settings)
         self._demo_client = DemoProxmoxClient()
         self._insights_cache: tuple[float, dict[str, Any]] | None = None
+        self._truenas_cache: tuple[float, dict[str, Any]] | None = None
         self.community = CommunityScriptsHub()
 
     @property
@@ -66,6 +68,7 @@ class ProxmoxService:
         await self._live_client.close()
         self.settings = new_settings
         self._insights_cache = None
+        self._truenas_cache = None
         if persist:
             save_settings(new_settings)
         self._live_client = ProxmoxClient(self.settings)
@@ -1241,6 +1244,107 @@ class ProxmoxService:
                             4,
                         )
 
+            # 5. Bare-Metal TrueNAS Storage Health (when configured)
+            truenas_pools_checked = 0
+            if self.settings.truenas_configured:
+                tn = await self._fetch_truenas_cached(force_refresh=False)
+                if not tn.get("connected"):
+                    add_finding(
+                        "warning",
+                        "truenas",
+                        "TrueNAS host unreachable",
+                        str(tn.get("error") or f"Unable to connect to TrueNAS at {self.settings.truenas_host}."),
+                        "Verify TrueNAS network connectivity and API key in System → MCP & Settings.",
+                        12,
+                        action_kind="truenas",
+                    )
+                else:
+                    tn_host = (tn.get("system") or {}).get("hostname") or "TrueNAS"
+                    tn_pools = tn.get("pools") or []
+                    truenas_pools_checked = len(tn_pools)
+                    for tp in tn_pools:
+                        tp_name = tp.get("name", "pool")
+                        tp_status = str(tp.get("status") or "UNKNOWN").upper()
+                        err_cnt = int(tp.get("disks_with_errors") or 0)
+                        disks_tot = int(tp.get("disks_total") or 0)
+                        if tp_status != "ONLINE" or not tp.get("healthy", True):
+                            err_note = f" ({err_cnt} of {disks_tot} disks with errors)" if err_cnt else ""
+                            add_finding(
+                                "critical",
+                                "truenas",
+                                f"TrueNAS pool '{tp_name}' is {tp_status}{err_note}",
+                                f"Host {tn_host} reported pool '{tp_name}' in {tp_status} state.",
+                                "Inspect errored drives, SMART stats, cables/HBA, and ZFS scrub status on TrueNAS immediately.",
+                                25,
+                                action_kind="truenas",
+                            )
+                        elif err_cnt > 0:
+                            add_finding(
+                                "warning",
+                                "truenas",
+                                f"TrueNAS pool '{tp_name}' has {err_cnt} disk(s) with ZFS errors",
+                                f"Pool '{tp_name}' on {tn_host} is ONLINE but {err_cnt} of {disks_tot} disk(s) show read/write/checksum errors.",
+                                "Inspect disk SMART health and run a ZFS scrub on TrueNAS.",
+                                12,
+                                action_kind="truenas",
+                            )
+
+                        tp_pct = float(tp.get("used_pct") or 0.0)
+                        if tp_pct >= 90:
+                            add_finding(
+                                "critical",
+                                "truenas",
+                                f"TrueNAS pool '{tp_name}' critically full ({tp_pct:.1f}%)",
+                                f"Pool '{tp_name}' on {tn_host} has less than 10% free space.",
+                                "Prune old media/snapshots or expand the ZFS pool to avoid severe fragmentation and write stalls.",
+                                18,
+                                action_kind="truenas",
+                            )
+                        elif tp_pct >= 80:
+                            add_finding(
+                                "warning",
+                                "truenas",
+                                f"TrueNAS pool '{tp_name}' above 80% ({tp_pct:.1f}%)",
+                                f"Pool '{tp_name}' on {tn_host} is at {tp_pct:.1f}% capacity.",
+                                "Keep ZFS pools under 80% utilization for healthy copy-on-write performance.",
+                                8,
+                                action_kind="truenas",
+                            )
+
+                    hot_disks = [
+                        d for d in (tn.get("disks") or [])
+                        if isinstance(d.get("temperature"), (int, float)) and d["temperature"] >= 48
+                    ]
+                    if hot_disks:
+                        hottest = max(hot_disks, key=lambda x: x["temperature"])
+                        sev = "critical" if hottest["temperature"] >= 55 else "warning"
+                        add_finding(
+                            sev,
+                            "truenas",
+                            f"TrueNAS hot drive(s): {hottest['name']} at {hottest['temperature']}°C",
+                            f"{len(hot_disks)} drive(s) on {tn_host} are at or above 48°C.",
+                            "Check chassis airflow, fan curves, and drive bay cooling.",
+                            14 if sev == "critical" else 6,
+                            action_kind="truenas",
+                        )
+
+                    tn_summary = tn.get("summary") or {}
+                    crit_al = int(tn_summary.get("critical_alerts") or 0)
+                    if crit_al > 0:
+                        first_al = next(
+                            (a for a in (tn.get("alerts") or []) if a.get("level") in ("CRITICAL", "ALERT", "EMERGENCY", "ERROR")),
+                            {},
+                        )
+                        add_finding(
+                            "critical",
+                            "truenas",
+                            f"TrueNAS has {crit_al} active critical alert(s)",
+                            str(first_al.get("message") or "Critical alert reported by TrueNAS.")[:220],
+                            "Open Storage → TrueNAS Host to inspect all active TrueNAS alerts.",
+                            15,
+                            action_kind="truenas",
+                        )
+
             status_label = "healthy" if score >= 85 else ("degraded" if score >= 60 else "critical")
             return {
                 "score": score,
@@ -1253,6 +1357,7 @@ class ProxmoxService:
                     "storages_checked": len(storages),
                     "disks_checked": len(disks),
                     "zfs_pools_checked": len(zfs_pools),
+                    "truenas_pools_checked": truenas_pools_checked,
                     "backup_jobs": len(backup_jobs),
                 },
             }
@@ -2285,7 +2390,7 @@ class ProxmoxService:
             triggers.append(f"Host RAM at {summary['mem_percent']}% (threshold ≥ {cfg['max_ram_pct']}%)")
 
         for f in health["findings"]:
-            if f["category"] == "storage" and f["severity"] in ("critical", "warning"):
+            if f["category"] in ("storage", "truenas") and f["severity"] in ("critical", "warning"):
                 triggers.append(f["title"])
             if cfg["notify_failed_tasks"] and f["category"] == "tasks":
                 triggers.append(f["title"])
@@ -2579,6 +2684,92 @@ class ProxmoxService:
             confirm=False,
             coro_fn=lambda: fetch_idrac_telemetry(self.settings),
         )
+
+    # ── Bare-Metal TrueNAS Host Monitoring (Strictly Read-Only) ──────────
+    async def _correlate_truenas_proxmox_links(self, tn_data: dict[str, Any]) -> list[dict[str, Any]]:
+        """Cross-reference TrueNAS IP/shares against Proxmox Datacenter NFS/SMB/iSCSI storages."""
+        if not tn_data.get("connected"):
+            return []
+        tn_url = str(tn_data.get("url") or "")
+        tn_hostname = (urlparse(tn_url).hostname or "").lower()
+        sys_hostname = str((tn_data.get("system") or {}).get("hostname") or "").lower()
+        if not tn_hostname and not sys_hostname:
+            return []
+
+        pve_storages: list[dict[str, Any]] = []
+        if hasattr(self.client, "get"):
+            pve_storages = await self._safe_call(self.client.get("/storage"), [])
+        elif self.settings.proxmox_demo_mode:
+            # Show example cross-link in Demo Mode
+            return [
+                {
+                    "proxmox_storage": "truenas-nfs",
+                    "type": "nfs",
+                    "server": tn_hostname or "192.168.1.x",
+                    "export": "/mnt/data-pool",
+                    "content": "backup,iso,vztmpl",
+                    "matched_share": "/mnt/data-pool",
+                }
+            ]
+
+        shares = tn_data.get("shares") or []
+        links: list[dict[str, Any]] = []
+        for st in pve_storages or []:
+            if not isinstance(st, dict):
+                continue
+            st_type = str(st.get("type") or "").lower()
+            if st_type not in ("nfs", "cifs", "iscsi", "iscsidirect"):
+                continue
+            server = str(st.get("server") or st.get("portal") or "").split(":")[0].strip().lower()
+            if not server or server not in (tn_hostname, sys_hostname):
+                continue
+            export = str(st.get("export") or st.get("share") or st.get("target") or "")
+            matched = next(
+                (
+                    sh["path"] or sh["name"]
+                    for sh in shares
+                    if export and (export == sh.get("path") or export == sh.get("name"))
+                ),
+                "",
+            )
+            links.append(
+                {
+                    "proxmox_storage": st.get("storage") or "",
+                    "type": st_type,
+                    "server": server,
+                    "export": export,
+                    "content": st.get("content") or "",
+                    "matched_share": matched,
+                }
+            )
+        return links
+
+    async def _fetch_truenas_cached(self, force_refresh: bool = False) -> dict[str, Any]:
+        now = time.monotonic()
+        if not force_refresh and self._truenas_cache and (now - self._truenas_cache[0]) < 8.0:
+            return self._truenas_cache[1]
+        data = await fetch_truenas_telemetry(self.settings)
+        if data.get("connected"):
+            data["proxmox_links"] = await self._correlate_truenas_proxmox_links(data)
+        self._truenas_cache = (now, data)
+        return data
+
+    async def get_truenas_telemetry(
+        self, *, force_refresh: bool = False, source: str = "webui"
+    ) -> dict[str, Any]:
+        return await self._run_audited(
+            source=source,
+            action="get_truenas_overview",
+            risk="read",
+            target=self.settings.truenas_host or "truenas",
+            params=None,
+            confirm=False,
+            coro_fn=lambda: self._fetch_truenas_cached(force_refresh=force_refresh),
+        )
+
+    async def test_truenas_connection(self) -> dict[str, Any]:
+        self._truenas_cache = None
+        return await probe_truenas_connection(self.settings)
 
     # ── Wake-on-LAN Portal ───────────────────────────────────────────────
     async def list_wol_devices(self, check_online: bool = True) -> list[dict[str, Any]]:
