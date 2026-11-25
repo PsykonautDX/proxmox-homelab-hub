@@ -1,0 +1,55 @@
+# Portainer Stack Compose — Proxmox Homelab Hub (WebUI + Streamable HTTP MCP)
+#
+# Paste directly into Portainer -> Stacks -> + Add stack -> Web editor.
+# All UI changes (API token, iDRAC, Alerts, Bookmarks, Uptime history, WoL devices)
+# persist automatically in the named Docker volume `proxmox_hub_data` (/app/data).
+#
+# Tip: Set PROXMOX_DEMO_MODE: "true" if you want to preview the dashboard immediately
+#      with simulated data before connecting your Proxmox VE API token.
+
+services:
+  proxmox-hub:
+    image: ghcr.io/psykonautdx/proxmox-homelab-hub:latest
+    container_name: proxmox-homelab-hub
+    restart: unless-stopped
+    ports:
+      - "8806:8806"
+    # For Wake-on-LAN UDP broadcast (255.255.255.255) to physical LAN devices,
+    # comment out `ports:` above and uncomment `network_mode: host` below.
+    # network_mode: host
+    environment:
+      TZ: Europe/London
+      WEBUI_HOST: 0.0.0.0
+      WEBUI_PORT: 8806
+      PROXMOX_DATA_DIR: /app/data
+      PROXMOX_ENV_FILE: /app/data/.env
+
+      # Proxmox VE Connection (can also be configured/edited directly in 06 SYSTEM -> MCP & Settings)
+      PROXMOX_HOST: https://your-proxmox-ip:8006
+      PROXMOX_TOKEN_ID: ""
+      PROXMOX_TOKEN_SECRET: ""
+      PROXMOX_VERIFY_SSL: "false"
+
+      # Safety Guardrails: read_only | safe | full
+      SAFETY_MODE: safe
+      ALLOW_DESTRUCTIVE: "false"
+      PROXMOX_DEMO_MODE: "false"
+
+      # Optional: Dell iDRAC Redfish API
+      IDRAC_HOST: ""
+      IDRAC_USER: root
+      IDRAC_PASSWORD: ""
+      ELECTRICITY_RATE_KWH: "0.26"
+      CURRENCY_SYMBOL: "£"
+
+      # Optional: SSH for direct Community-Scripts deploy & LXC Docker inspection
+      PROXMOX_SSH_USER: root
+      PROXMOX_SSH_PORT: "22"
+      PROXMOX_SSH_KEY_PATH: ""
+    volumes:
+      - proxmox_hub_data:/app/data
+      # Optional: mount a host SSH key (read-only) for direct script deployment
+      # - /root/.ssh/id_ed25519:/root/.ssh/id_ed25519:ro
+
+volumes:
+  proxmox_hub_data:

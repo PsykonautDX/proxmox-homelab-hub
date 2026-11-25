@@ -1,0 +1,12 @@
+.venv/
+_rollback/
+data/
+dist/
+tests/
+__pycache__/
+*.pyc
+.pytest_cache/
+.env
+restore_rollback.ps1
+start.ps1
+build_docker_bundle.ps1

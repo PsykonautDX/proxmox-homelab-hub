@@ -1,0 +1,41 @@
+services:
+  proxmox-hub:
+    build: .
+    image: proxmox-homelab-hub:latest
+    container_name: proxmox-homelab-hub
+    restart: unless-stopped
+    ports:
+      - "8806:8806"
+    environment:
+      - TZ=${TZ:-Europe/London}
+      - WEBUI_HOST=0.0.0.0
+      - WEBUI_PORT=8806
+      - PROXMOX_DATA_DIR=/app/data
+      - PROXMOX_ENV_FILE=/app/data/.env
+      # Set these here, or leave blank and configure via the WebUI (06 SYSTEM -> MCP & Settings)
+      - PROXMOX_HOST=${PROXMOX_HOST:-https://your-proxmox-ip:8006}
+      - PROXMOX_TOKEN_ID=${PROXMOX_TOKEN_ID:-}
+      - PROXMOX_TOKEN_SECRET=${PROXMOX_TOKEN_SECRET:-}
+      - PROXMOX_VERIFY_SSL=${PROXMOX_VERIFY_SSL:-false}
+      # Safety Guardrails: read_only | safe | full
+      - SAFETY_MODE=${SAFETY_MODE:-safe}
+      - ALLOW_DESTRUCTIVE=${ALLOW_DESTRUCTIVE:-false}
+      # Set to true to explore with simulated data before adding a Proxmox API token
+      - PROXMOX_DEMO_MODE=${PROXMOX_DEMO_MODE:-false}
+      # Optional Dell iDRAC Redfish telemetry
+      - IDRAC_HOST=${IDRAC_HOST:-}
+      - IDRAC_USER=${IDRAC_USER:-root}
+      - IDRAC_PASSWORD=${IDRAC_PASSWORD:-}
+      - ELECTRICITY_RATE_KWH=${ELECTRICITY_RATE_KWH:-0.26}
+      - CURRENCY_SYMBOL=${CURRENCY_SYMBOL:-£}
+      # Optional SSH for direct Community-Scripts deploy & LXC Docker inspection
+      - PROXMOX_SSH_USER=${PROXMOX_SSH_USER:-root}
+      - PROXMOX_SSH_PORT=${PROXMOX_SSH_PORT:-22}
+      - PROXMOX_SSH_KEY_PATH=${PROXMOX_SSH_KEY_PATH:-}
+    volumes:
+      - proxmox_hub_data:/app/data
+      # Optional: mount an SSH private key read-only for 1-click Community Scripts / LXC Docker
+      # - /root/.ssh/id_ed25519:/root/.ssh/id_ed25519:ro
+
+volumes:
+  proxmox_hub_data:

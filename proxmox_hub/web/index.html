@@ -1,0 +1,1142 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="obsidian">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PVE // CRYSTARIUM — Proxmox Homelab Hub &amp; MCP</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <!-- 6-Paradigm Sidebar Rail -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <polygon points="12 2 22 12 12 22 2 12"></polygon>
+            <polygon points="12 6 18 12 12 18 6 12"></polygon>
+          </svg>
+        </div>
+        <div>
+          <div class="brand-title">PVE // HUB</div>
+          <div class="brand-sub">Crystarium Control</div>
+        </div>
+      </div>
+
+      <nav class="nav" id="main-nav">
+        <button class="nav-item active" data-view="command">
+          <span class="nav-num">01</span> Command
+        </button>
+        <button class="nav-item" data-view="fleet">
+          <span class="nav-num">02</span> Fleet
+          <span class="nav-badge" id="nav-guest-count">0</span>
+        </button>
+        <button class="nav-item" data-view="deploy">
+          <span class="nav-num">03</span> Deploy
+        </button>
+        <button class="nav-item" data-view="storage">
+          <span class="nav-num">04</span> Storage
+        </button>
+        <button class="nav-item" data-view="network">
+          <span class="nav-num">05</span> Network
+        </button>
+        <button class="nav-item" data-view="system">
+          <span class="nav-num">06</span> System
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="endpoint-chip">
+          <span class="dot" id="sidebar-dot"></span>
+          <div>
+            <div class="endpoint-label">Host Node</div>
+            <div class="endpoint-host mono" id="sidebar-host">192.168.1.2:8006</div>
+          </div>
+        </div>
+        <div class="mcp-chip">
+          <span class="tag tag-cyan">44 MCP TOOLS</span>
+          <span class="mono small">/mcp + stdio</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main HUD Workspace -->
+    <div class="main-wrap">
+      <header class="topbar">
+        <div class="topbar-left">
+          <div>
+            <div class="paradigm-kicker" id="paradigm-kicker">PARADIGM 01 // TELEMETRY &amp; CONSTELLATION</div>
+            <h1 id="page-title">Command Overview</h1>
+          </div>
+          <span class="status-pill" id="conn-pill">Syncing...</span>
+          <span class="status-pill subtle" id="safety-pill">SAFE MODE</span>
+        </div>
+        <div class="topbar-right">
+          <button class="btn btn-ghost btn-sm mono" id="btn-cmdk" title="Command Palette (Ctrl+K)">⌘K</button>
+          <button class="btn btn-ghost btn-sm" id="btn-theme-toggle" title="Switch between Gran Pulse Obsidian & Cocoon Frost">◇ Frost</button>
+          <button class="btn btn-ghost btn-sm" id="btn-sfx-toggle" title="Toggle crystalline FFXIII UI chimes">🔇 SFX</button>
+          <label class="auto-refresh-toggle" title="Auto-refresh every 10 seconds">
+            <input type="checkbox" id="auto-refresh-chk" checked />
+            <span>10s</span>
+          </label>
+          <button class="btn btn-ghost btn-sm" id="btn-refresh">↻</button>
+          <button class="btn btn-primary btn-sm" id="btn-quick-provision">+ Deploy</button>
+        </div>
+      </header>
+
+      <div id="mode-banner" class="banner hidden"></div>
+
+      <main class="content">
+        <!-- ═══════════════════════════════════════════════════════════
+             PARADIGM 01: COMMAND (True Homelab Overview + Live Pulse + iDRAC HUD)
+             ═══════════════════════════════════════════════════════════ -->
+        <section class="view active" id="view-command">
+          <div class="kpi-grid" id="overview-kpis"></div>
+
+          <div class="two-col">
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <h2>Live Service Pulse &amp; Quick Launch</h2>
+                  <p class="muted" id="cmd-uptime-sub">HTTP health across your homelab apps — click to open</p>
+                </div>
+                <div style="display:flex;gap:6px;">
+                  <button class="btn btn-xs btn-ghost" id="btn-cmd-probe">↻ Probe</button>
+                  <button class="btn btn-xs btn-ghost" id="btn-cmd-uptime-all">Details →</button>
+                </div>
+              </div>
+              <div id="cmd-service-pulse" class="tag-row" style="gap:7px;"></div>
+            </div>
+
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <h2>Dell R640 Power &amp; Thermals (iDRAC)</h2>
+                  <p class="muted" id="cmd-idrac-sub">Live wall wattage, monthly cost, temperatures &amp; fans</p>
+                </div>
+                <button class="btn btn-xs btn-ghost" id="btn-cmd-idrac-all">Full Telemetry →</button>
+              </div>
+              <div id="cmd-idrac-mini"></div>
+            </div>
+          </div>
+
+          <div class="two-col">
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <h2>Node Telemetry (RRD)</h2>
+                  <p class="muted" id="rrd-subtitle">CPU &amp; Memory utilization history</p>
+                </div>
+                <div class="segmented" id="rrd-timeframe">
+                  <button class="seg active" data-tf="hour">1H</button>
+                  <button class="seg" data-tf="day">24H</button>
+                  <button class="seg" data-tf="week">7D</button>
+                </div>
+              </div>
+              <div id="node-rrd-chart" class="chart-box"></div>
+            </div>
+
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <h2>Actionable Homelab Doctor</h2>
+                  <p class="muted">Automated diagnostics with 1-click remediation jumps</p>
+                </div>
+                <div id="health-score-badge" class="health-pill">--</div>
+              </div>
+              <div id="health-findings" class="findings-list"></div>
+            </div>
+          </div>
+
+          <div class="two-col">
+            <div class="card">
+              <div class="card-header">
+                <h2>Host Nodes, RootFS &amp; Daemons</h2>
+                <span class="muted small mono" id="node-kernel"></span>
+              </div>
+              <div id="nodes-list"></div>
+            </div>
+
+            <div class="card">
+              <div class="card-header">
+                <h2>Recent Activity (Proxmox &amp; MCP)</h2>
+                <button class="btn btn-ghost btn-sm" id="btn-jump-tasks">View all →</button>
+              </div>
+              <div id="overview-activity" class="mini-list"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ═══════════════════════════════════════════════════════════
+             PARADIGM 02: FLEET (Guests, Docker, Uptime, Capacity, Checkpoints)
+             ═══════════════════════════════════════════════════════════ -->
+        <section class="view" id="view-fleet">
+          <div class="subtab-bar" data-group="fleet">
+            <button class="subtab active" data-sub="guests">VMs &amp; LXCs</button>
+            <button class="subtab" data-sub="docker">Docker Containers</button>
+            <button class="subtab" data-sub="uptime">Service Uptime</button>
+            <button class="subtab" data-sub="capacity">Capacity &amp; Sizing</button>
+            <button class="subtab" data-sub="checkpoints">Snapshot Checkpoints</button>
+          </div>
+
+          <!-- Sub-pane: Guests -->
+          <div class="subpane active" id="sub-fleet-guests">
+            <div class="toolbar">
+              <input type="search" id="guest-search" class="input" placeholder="Search name, VMID, IP, bridge, storage, or tag..." />
+              <div class="segmented" id="guest-type-filter">
+                <button class="seg active" data-val="">All</button>
+                <button class="seg" data-val="qemu">VMs</button>
+                <button class="seg" data-val="lxc">LXCs</button>
+              </div>
+              <div class="segmented" id="guest-status-filter">
+                <button class="seg active" data-val="">Any</button>
+                <button class="seg" data-val="running">Running</button>
+                <button class="seg" data-val="stopped">Stopped</button>
+              </div>
+              <select id="guest-group-by" class="input" style="max-width:168px;">
+                <option value="none">Group: Flat</option>
+                <option value="block">Group: VMID Block</option>
+                <option value="tag">Group: Tag</option>
+                <option value="bridge">Group: Bridge</option>
+                <option value="storage">Group: Storage</option>
+              </select>
+              <div class="segmented" id="guest-layout-toggle" style="margin-left:auto;">
+                <button class="seg active" data-layout="table" title="Compact Table">≡ Table</button>
+                <button class="seg" data-layout="cards" title="HUD Card Grid">⊞ Cards</button>
+              </div>
+            </div>
+
+            <div class="tag-filter-bar" id="guest-tag-chips"></div>
+
+            <div class="bulk-bar hidden" id="guest-bulk-bar">
+              <span class="mono small"><strong id="bulk-count">0</strong> selected</span>
+              <div class="action-group">
+                <button class="btn btn-xs btn-primary" data-bulk="start">▶ Start</button>
+                <button class="btn btn-xs" data-bulk="reboot">↻ Reboot</button>
+                <button class="btn btn-xs" data-bulk="shutdown">⏻ Shutdown</button>
+                <button class="btn btn-xs" data-bulk="snapshot">📸 Snapshot</button>
+                <button class="btn btn-xs" data-bulk="backup">💾 Backup</button>
+                <button class="btn btn-xs btn-ghost" id="btn-clear-bulk">Clear</button>
+              </div>
+            </div>
+
+            <div class="card table-card" id="guests-table-wrap">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th style="width:30px;"><input type="checkbox" id="chk-select-all" /></th>
+                    <th class="sortable" data-sort="vmid">Guest</th>
+                    <th class="sortable" data-sort="name">Identity, IPs &amp; App</th>
+                    <th class="sortable" data-sort="cpu">CPU / RAM ATB</th>
+                    <th class="sortable" data-sort="uptime">Uptime</th>
+                    <th>Backup</th>
+                    <th class="right">Controls</th>
+                  </tr>
+                </thead>
+                <tbody id="guests-tbody"></tbody>
+              </table>
+            </div>
+            <div class="fleet-cards-grid hidden" id="guests-cards-wrap"></div>
+          </div>
+
+          <!-- Sub-pane: Unified Docker Containers -->
+          <div class="subpane" id="sub-fleet-docker">
+            <div class="kpi-grid" id="docker-kpis"></div>
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <h2>Unified Docker Fleet</h2>
+                  <p class="muted">Containers discovered across QEMU Docker VMs (Guest Agent) &amp; Docker LXCs (SSH)</p>
+                </div>
+                <button class="btn btn-sm" id="btn-docker-refresh">↻ Scan Docker Hosts</button>
+              </div>
+              <div id="docker-hosts-bar" class="tag-row" style="margin-bottom:12px;"></div>
+              <div class="table-card">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Container</th>
+                      <th>Host Guest</th>
+                      <th>Image</th>
+                      <th>State</th>
+                      <th>Ports</th>
+                      <th class="right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="docker-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+            <div class="card hidden" id="docker-log-panel">
+              <div class="card-header">
+                <h2 class="mono" id="docker-log-title">Container Logs</h2>
+                <button class="btn btn-ghost btn-xs" id="btn-close-docker-log">✕ Close</button>
+              </div>
+              <pre class="terminal" id="docker-log-content"></pre>
+            </div>
+          </div>
+
+          <!-- Sub-pane: Service Uptime (Mini Uptime Kuma) -->
+          <div class="subpane" id="sub-fleet-uptime">
+            <div class="kpi-grid" id="uptime-kpis"></div>
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <h2>Live Homelab Service Uptime Monitor</h2>
+                  <p class="muted">HTTP/TCP health probes across all auto-detected &amp; custom-bookmarked web apps</p>
+                </div>
+                <button class="btn btn-primary btn-sm" id="btn-uptime-probe">⚡ Probe All Services Now</button>
+              </div>
+              <div class="table-card">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Service</th>
+                      <th>Endpoint</th>
+                      <th>Status</th>
+                      <th>Latency</th>
+                      <th>24h Uptime</th>
+                      <th>Recent History</th>
+                      <th class="right">Open</th>
+                    </tr>
+                  </thead>
+                  <tbody id="uptime-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sub-pane: Capacity & Right-Sizing -->
+          <div class="subpane" id="sub-fleet-capacity">
+            <div class="kpi-grid" id="capacity-kpis"></div>
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <h2>Right-Sizing Opportunities</h2>
+                  <p class="muted">Running guests with high allocated RAM (≥ 8 GiB, &lt; 18% used) or low vCPU utilization</p>
+                </div>
+              </div>
+              <div id="rightsizing-wrap"></div>
+            </div>
+            <div class="two-col">
+              <div class="card">
+                <div class="card-header"><h2>Top CPU &amp; Memory Consumers</h2></div>
+                <div id="top-compute-wrap"></div>
+              </div>
+              <div class="card">
+                <div class="card-header"><h2>Top Disk I/O &amp; Network Talkers</h2></div>
+                <div id="top-io-wrap"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sub-pane: Snapshot Checkpoints -->
+          <div class="subpane" id="sub-fleet-checkpoints">
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <h2>Group Snapshot Checkpoints (Pre-Maintenance Safety Net)</h2>
+                  <p class="muted">Snapshot an entire tag group (e.g. <code>arr</code>, <code>ai</code>, <code>docker</code>) in one click before updating</p>
+                </div>
+                <button class="btn btn-sm" id="btn-chk-refresh">↻ Refresh</button>
+              </div>
+              <div id="checkpoint-groups-grid" class="storage-grid" style="margin-bottom:14px;"></div>
+            </div>
+            <div class="card">
+              <div class="card-header">
+                <h2>All Fleet Snapshots (<span id="all-snaps-count">0</span>)</h2>
+              </div>
+              <div id="all-snaps-wrap"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ═══════════════════════════════════════════════════════════
+             PARADIGM 03: DEPLOY (Community Scripts, Provisioning, ISOs, Templates)
+             ═══════════════════════════════════════════════════════════ -->
+        <section class="view" id="view-deploy">
+          <div class="subtab-bar" data-group="deploy">
+            <button class="subtab active" data-sub="community">⚡ Community Scripts (<span id="cs-count">0</span>)</button>
+            <button class="subtab" data-sub="provision">Provisioning Studio</button>
+            <button class="subtab" data-sub="isos">ISO Library &amp; Web Search</button>
+            <button class="subtab" data-sub="appliances">LXC Templates (<span id="apl-count">0</span>)</button>
+          </div>
+
+          <!-- Sub-pane: Community Scripts -->
+          <div class="subpane active" id="sub-deploy-community">
+            <div class="card">
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
+                <div>
+                  <strong style="font-size:13px;letter-spacing:0.06em;text-transform:uppercase;">✨ Latest Community Scripts</strong>
+                  <span class="muted small" id="cs-meta-label" style="margin-left:8px;">Loading live catalog...</span>
+                </div>
+                <div style="display:flex;gap:8px;">
+                  <button class="btn btn-xs btn-ghost" id="btn-cs-test-ssh">🔑 Test SSH Deploy</button>
+                  <button class="btn btn-xs btn-ghost" id="btn-cs-refresh">↻ Refresh Catalog</button>
+                </div>
+              </div>
+              <div id="cs-latest-strip" class="latest-strip"></div>
+
+              <div class="toolbar" style="margin:14px 0 12px;">
+                <input type="search" id="cs-search" class="input" placeholder="Search 780+ scripts (docker, plex, sonarr, ollama, activepieces)..." />
+                <select id="cs-category" class="input" style="max-width:220px;"></select>
+                <select id="cs-type" class="input" style="max-width:130px;">
+                  <option value="">All Types</option>
+                  <option value="lxc">LXC</option>
+                  <option value="vm">VM</option>
+                  <option value="pve">PVE Tool</option>
+                  <option value="addon">Addon</option>
+                  <option value="turnkey">TurnKey</option>
+                </select>
+                <select id="cs-sort" class="input" style="max-width:140px;">
+                  <option value="latest">Sort: Latest</option>
+                  <option value="name">Sort: A → Z</option>
+                </select>
+                <label class="auto-refresh-toggle">
+                  <input type="checkbox" id="cs-include-dev" />
+                  <span>Dev</span>
+                </label>
+              </div>
+              <div id="cs-grid" class="tools-grid"></div>
+            </div>
+          </div>
+
+          <!-- Sub-pane: Provisioning Studio -->
+          <div class="subpane" id="sub-deploy-provision">
+            <div class="two-col-wide">
+              <div class="card">
+                <div class="card-header">
+                  <div>
+                    <h2>Provisioning Studio</h2>
+                    <p class="muted">Create a QEMU VM or LXC container with best-practice defaults</p>
+                  </div>
+                  <div class="segmented" id="prov-mode-tabs">
+                    <button class="seg active" data-pmode="vm">QEMU VM</button>
+                    <button class="seg" data-pmode="lxc">LXC Container</button>
+                  </div>
+                </div>
+                <div class="preset-bar" id="prov-presets"></div>
+
+                <form id="form-create-vm" class="form-grid">
+                  <div class="field"><label>VM Name *</label><input class="input" name="name" required placeholder="e.g. ubuntu-docker-01" /></div>
+                  <div class="field"><label>VMID (auto)</label><input class="input mono" name="vmid" type="number" id="vm-next-id" /></div>
+                  <div class="field"><label>vCPU Cores</label><input class="input mono" name="cores" type="number" value="2" min="1" max="64" /></div>
+                  <div class="field"><label>Memory (MB)</label><input class="input mono" name="memory_mb" type="number" value="2048" step="256" min="256" /></div>
+                  <div class="field"><label>Disk Storage</label><select class="input" name="disk_storage" id="vm-storage-select"></select></div>
+                  <div class="field"><label>Disk Size (GB)</label><input class="input mono" name="disk_size_gb" type="number" value="32" min="4" /></div>
+                  <div class="field full"><label>Install ISO Image (optional)</label><select class="input" name="iso" id="vm-iso-select"></select></div>
+                  <div class="field"><label>Network Bridge</label><select class="input" name="bridge" id="vm-bridge-select"></select></div>
+                  <div class="field"><label>VLAN Tag</label><input class="input mono" name="vlan_tag" type="number" placeholder="None" /></div>
+                  <div class="field"><label>Guest OS Type</label><select class="input" name="ostype"><option value="l26">Linux 6.x (l26)</option><option value="win11">Windows 11</option><option value="win10">Windows 10</option><option value="other">Other</option></select></div>
+                  <div class="field"><label>Firmware (BIOS)</label><select class="input" name="bios"><option value="seabios">SeaBIOS</option><option value="ovmf">OVMF (UEFI)</option></select></div>
+                  <div class="field full"><label>Tags</label><input class="input" name="tags" placeholder="homelab;docker" /></div>
+                  <div class="field full"><label>Description</label><input class="input" name="description" placeholder="Purpose of this VM..." /></div>
+                  <div class="field full checkbox-row">
+                    <label><input type="checkbox" name="qemu_agent" checked /> QEMU Guest Agent</label>
+                    <label><input type="checkbox" name="onboot" /> Start at boot</label>
+                    <label><input type="checkbox" name="start_after_create" /> Start immediately</label>
+                  </div>
+                  <div class="field full form-actions"><button type="submit" class="btn btn-primary" data-write-btn>Create QEMU VM</button></div>
+                </form>
+
+                <form id="form-create-lxc" class="form-grid hidden">
+                  <div class="field"><label>Hostname *</label><input class="input" name="hostname" required placeholder="e.g. pihole-dns" /></div>
+                  <div class="field"><label>CT ID (auto)</label><input class="input mono" name="vmid" type="number" id="lxc-next-id" /></div>
+                  <div class="field full"><label>OS Template *</label><select class="input" name="ostemplate" id="lxc-template-select" required></select></div>
+                  <div class="field"><label>CPU Cores</label><input class="input mono" name="cores" type="number" value="1" min="1" max="64" /></div>
+                  <div class="field"><label>Memory (MB)</label><input class="input mono" name="memory_mb" type="number" value="1024" step="128" min="128" /></div>
+                  <div class="field"><label>RootFS Storage</label><select class="input" name="disk_storage" id="lxc-storage-select"></select></div>
+                  <div class="field"><label>RootFS Size (GB)</label><input class="input mono" name="disk_size_gb" type="number" value="8" min="1" /></div>
+                  <div class="field"><label>Bridge</label><select class="input" name="bridge" id="lxc-bridge-select"></select></div>
+                  <div class="field"><label>IPv4 (CIDR or dhcp)</label><input class="input mono" name="ip_config" value="dhcp" /></div>
+                  <div class="field"><label>Gateway</label><input class="input mono" name="gateway" placeholder="192.168.1.1" /></div>
+                  <div class="field"><label>Root Password</label><input class="input" name="password" type="password" /></div>
+                  <div class="field full"><label>Tags</label><input class="input" name="tags" placeholder="homelab;lxc" /></div>
+                  <div class="field full checkbox-row">
+                    <label><input type="checkbox" name="unprivileged" checked /> Unprivileged</label>
+                    <label><input type="checkbox" name="nesting" checked /> Nesting</label>
+                    <label><input type="checkbox" name="onboot" checked /> Start on boot</label>
+                    <label><input type="checkbox" name="start_after_create" checked /> Start immediately</label>
+                  </div>
+                  <div class="field full form-actions"><button type="submit" class="btn btn-primary" data-write-btn>Create LXC Container</button></div>
+                </form>
+              </div>
+              <div class="stack">
+                <div class="card">
+                  <div class="card-header"><h2>Quick Clone from Template</h2></div>
+                  <div id="vm-templates-list" class="mini-list"></div>
+                </div>
+                <div class="card">
+                  <div class="card-header"><h2>Homelab Provisioning Tips</h2></div>
+                  <ul class="tips-list">
+                    <li>Use <strong>Community Scripts</strong> for turnkey apps (*arr, Plex, AI tools) with pre-filled Advanced LXC settings.</li>
+                    <li>Enable <strong>QEMU Agent</strong> on VMs to unlock zero-SSH Docker inspection &amp; Guest File Explorer.</li>
+                    <li>Pick <code>ISO</code> as your template storage instead of <code>local</code> to keep boot disk `/` clean.</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sub-pane: ISO Library & Web Search -->
+          <div class="subpane" id="sub-deploy-isos">
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <h2>Direct URL Download &amp; Web ISO Search</h2>
+                  <p class="muted">Proxmox downloads ISOs directly server-side onto your chosen storage</p>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <span class="muted small">Target Storage:</span>
+                  <select id="iso-target-storage" class="input mono" style="max-width:190px;"></select>
+                </div>
+              </div>
+              <div class="two-col" style="margin-bottom:14px;">
+                <form id="form-iso-search" style="display:flex;gap:8px;">
+                  <input class="input" id="iso-search-input" placeholder="Search mirrors &amp; GitHub releases (alpine, proxmox, talos, debian, virtio)..." />
+                  <button class="btn btn-primary" type="submit">🔍 Search</button>
+                </form>
+                <form id="form-iso-direct" style="display:flex;gap:8px;">
+                  <input class="input mono" id="iso-direct-url" placeholder="Paste any direct https://.../image.iso URL..." />
+                  <button class="btn" type="button" id="btn-iso-probe">Probe</button>
+                  <button class="btn btn-primary" type="submit" data-write-btn>⬇ Pull</button>
+                </form>
+              </div>
+              <div id="iso-probe-result" class="test-result hidden"></div>
+              <div id="iso-web-results-wrap" class="hidden" style="margin-bottom:16px;">
+                <div class="muted small" style="margin-bottom:8px;">LIVE MIRROR &amp; GITHUB RELEASE RESULTS</div>
+                <div id="iso-web-results" class="mini-list"></div>
+              </div>
+              <div class="muted small" style="margin-bottom:8px;">VERIFIED HOMELAB ISO LIBRARY (ONE-CLICK SERVER DOWNLOAD)</div>
+              <div id="iso-curated-grid" class="tools-grid"></div>
+            </div>
+          </div>
+
+          <!-- Sub-pane: Official Proxmox LXC Templates -->
+          <div class="subpane" id="sub-deploy-appliances">
+            <div class="card">
+              <div class="card-header"><h2>Official Proxmox LXC Templates (<code>aplinfo</code>)</h2></div>
+              <div class="toolbar" style="margin-bottom:12px;">
+                <input type="search" id="apl-search" class="input" placeholder="Filter official Debian, Ubuntu, Alpine &amp; TurnKey templates..." />
+                <select id="apl-section" class="input" style="max-width:190px;"></select>
+              </div>
+              <div id="apl-list" class="tools-grid"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ═══════════════════════════════════════════════════════════
+             PARADIGM 04: STORAGE (Pools/ZFS/SMART, Backups, File Explorer)
+             ═══════════════════════════════════════════════════════════ -->
+        <section class="view" id="view-storage">
+          <div class="subtab-bar" data-group="storage">
+            <button class="subtab active" data-sub="pools">Pools, ZFS, SMART &amp; Mounts</button>
+            <button class="subtab" data-sub="backups">PBS Coverage &amp; Scheduler</button>
+            <button class="subtab" data-sub="files">Dual-Mode File Explorer</button>
+          </div>
+
+          <!-- Sub-pane: Pools, ZFS, SMART & Bind Mounts -->
+          <div class="subpane active" id="sub-storage-pools">
+            <div class="card">
+              <div class="card-header">
+                <h2>Storage Pools &amp; Guest Allocation</h2>
+                <span class="muted small">Pools over 80% are flagged automatically</span>
+              </div>
+              <div id="storage-pools-grid" class="storage-grid"></div>
+            </div>
+            <div class="card" id="zfs-card">
+              <div class="card-header">
+                <h2>ZFS Pools &amp; Fragmentation</h2>
+                <span class="muted small">Health, alloc/free &amp; fragmentation telemetry</span>
+              </div>
+              <div id="zfs-pools-grid" class="storage-grid"></div>
+            </div>
+            <div class="two-col">
+              <div class="card">
+                <div class="card-header">
+                  <h2>Physical Disks &amp; SSD Life Remaining</h2>
+                  <span class="muted small">Proxmox reports SSD endurance as % life left</span>
+                </div>
+                <div id="disks-table-wrap"></div>
+              </div>
+              <div class="card">
+                <div class="card-header">
+                  <h2>LXC Bind Mounts (<code>mp0</code> / <code>mp1</code>)</h2>
+                </div>
+                <div id="bind-mounts-wrap" class="mini-list"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sub-pane: PBS Backup Coverage & Scheduler -->
+          <div class="subpane" id="sub-storage-backups">
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <h2>PBS &amp; VZDump Backup Coverage Matrix</h2>
+                  <p class="muted" id="backup-coverage-sub">Cross-referencing every guest against backup archives</p>
+                </div>
+                <div class="segmented" id="backup-filter">
+                  <button class="seg active" data-val="">All</button>
+                  <button class="seg" data-val="none">No Backup</button>
+                  <button class="seg" data-val="stale">Stale / Old</button>
+                  <button class="seg" data-val="fresh">Fresh (&lt;48h)</button>
+                </div>
+              </div>
+              <div id="backup-coverage-wrap"></div>
+            </div>
+            <div class="two-col">
+              <div class="card">
+                <div class="card-header">
+                  <h2>Scheduled Jobs &amp; Recent Archives</h2>
+                  <button class="btn btn-primary btn-xs" id="btn-toggle-bkp-sched">+ Schedule Job</button>
+                </div>
+                <form id="form-backup-schedule" class="form-grid hidden" style="margin-bottom:14px;padding:12px;background:var(--surface-2);border:1px solid var(--border);">
+                  <div class="field"><label>Target Backup Storage *</label><input class="input mono" name="storage" value="pbs" required /></div>
+                  <div class="field"><label>Schedule</label><input class="input mono" name="schedule" value="02:00" required /></div>
+                  <div class="field"><label>Guest VMIDs (comma-sep, or check All)</label><input class="input mono" name="vmid" placeholder="e.g. 200,201,400" /></div>
+                  <div class="field"><label>Mode &amp; Compress</label><div style="display:flex;gap:6px;"><select class="input" name="mode"><option value="snapshot">snapshot</option><option value="suspend">suspend</option><option value="stop">stop</option></select><select class="input" name="compress"><option value="zstd">zstd</option><option value="gzip">gzip</option><option value="0">none</option></select></div></div>
+                  <div class="field full"><label>Comment</label><input class="input" name="comment" placeholder="Nightly PBS backup" /></div>
+                  <div class="field full checkbox-row"><label><input type="checkbox" name="all_guests" /> Back up ALL guests</label></div>
+                  <div class="field full form-actions">
+                    <button type="submit" class="btn btn-primary btn-sm" data-write-btn>Create Schedule</button>
+                    <button type="button" class="btn btn-ghost btn-sm" id="btn-cancel-bkp-sched">Cancel</button>
+                  </div>
+                </form>
+                <div id="backups-wrap"></div>
+              </div>
+              <div class="card">
+                <div class="card-header"><h2>ISO Images &amp; LXC Templates Inventory</h2></div>
+                <div id="media-inventory"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sub-pane: Dual-Mode File Explorer -->
+          <div class="subpane" id="sub-storage-files">
+            <div class="toolbar" style="justify-content:space-between;">
+              <div class="segmented" id="file-mode-tabs">
+                <button class="seg active" data-fmode="storage">Proxmox Storage Volumes</button>
+                <button class="seg" data-fmode="guest">Guest VM Files &amp; Exec (QEMU Agent)</button>
+              </div>
+              <div class="muted small mono" id="file-summary-label"></div>
+            </div>
+
+            <div id="files-storage-pane" class="stack">
+              <div class="card">
+                <div class="toolbar" style="margin-bottom:12px;">
+                  <select id="fe-storage-select" class="input mono" style="max-width:200px;"></select>
+                  <select id="fe-content-select" class="input" style="max-width:170px;">
+                    <option value="">All Content Types</option>
+                    <option value="iso">ISOs</option>
+                    <option value="vztmpl">LXC Templates</option>
+                    <option value="backup">Backups</option>
+                    <option value="images">VM Disks</option>
+                    <option value="rootdir">LXC RootFS</option>
+                    <option value="snippets">Snippets</option>
+                  </select>
+                  <input type="search" id="fe-search" class="input" placeholder="Filter filenames / VolIDs / VMID..." />
+                  <button class="btn btn-sm" id="btn-toggle-upload">⬆ Upload File</button>
+                </div>
+                <form id="form-file-upload" class="form-grid hidden" style="margin-bottom:14px;padding:12px;background:var(--surface-2);border:1px solid var(--border);">
+                  <div class="field"><label>Target Storage</label><select class="input mono" name="storage" id="upload-storage-select"></select></div>
+                  <div class="field"><label>Content Type</label><select class="input" name="content"><option value="iso">ISO</option><option value="vztmpl">LXC Template</option><option value="snippets">Snippet</option></select></div>
+                  <div class="field full"><label>Select Local File</label><input class="input" type="file" name="file" required /></div>
+                  <div class="field full form-actions">
+                    <button type="submit" class="btn btn-primary btn-sm" data-write-btn>Upload</button>
+                    <button type="button" class="btn btn-ghost btn-sm" id="btn-cancel-upload">Cancel</button>
+                  </div>
+                </form>
+                <div class="table-card">
+                  <table class="data-table">
+                    <thead><tr><th>Volume / File</th><th>Storage</th><th>Content</th><th>VMID</th><th>Size</th><th>Created</th><th class="right">Actions</th></tr></thead>
+                    <tbody id="fe-storage-tbody"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <div id="files-guest-pane" class="hidden stack">
+              <div class="card">
+                <div class="toolbar" style="margin-bottom:10px;">
+                  <select id="ge-vm-select" class="input mono" style="max-width:260px;"></select>
+                  <input class="input mono" id="ge-path-input" value="/" style="max-width:340px;" />
+                  <button class="btn btn-primary btn-sm" id="btn-ge-go">Open</button>
+                  <button class="btn btn-ghost btn-sm" id="btn-ge-up">↑ Up</button>
+                </div>
+                <div class="preset-bar" style="margin-bottom:10px;">
+                  <button type="button" class="preset-chip" data-ge-jump="/">/</button>
+                  <button type="button" class="preset-chip" data-ge-jump="/etc">/etc</button>
+                  <button type="button" class="preset-chip" data-ge-jump="/opt">/opt</button>
+                  <button type="button" class="preset-chip" data-ge-jump="/var/log">/var/log</button>
+                  <button type="button" class="preset-chip" data-ge-jump="/home">/home</button>
+                  <button type="button" class="preset-chip" data-ge-jump="/root">/root</button>
+                </div>
+                <div class="two-col">
+                  <div>
+                    <div class="muted small" style="margin-bottom:6px;">DIRECTORY LISTING</div>
+                    <div id="ge-dir-list" class="mini-list" style="max-height:400px;"></div>
+                  </div>
+                  <div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                      <span class="muted small mono" id="ge-editor-path">Select a file to inspect or edit</span>
+                      <button class="btn btn-primary btn-xs hidden" id="btn-ge-save" data-write-btn>💾 Save</button>
+                    </div>
+                    <textarea class="input" id="ge-editor-content" style="min-height:340px;" placeholder="Click any file on the left to read via QEMU Guest Agent..."></textarea>
+                  </div>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-header"><h2>Guest Agent Quick Command Runner</h2></div>
+                <form id="form-ge-exec" style="display:flex;gap:8px;margin-bottom:10px;">
+                  <input class="input mono" id="ge-exec-cmd" placeholder="e.g. df -h && docker ps" />
+                  <button class="btn btn-primary btn-sm" type="submit" data-write-btn>▶ Run</button>
+                </form>
+                <pre class="terminal hidden" id="ge-exec-output"></pre>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ═══════════════════════════════════════════════════════════
+             PARADIGM 05: NETWORK (IPAM, Topology Map, Wake-on-LAN, Firewall)
+             ═══════════════════════════════════════════════════════════ -->
+        <section class="view" id="view-network">
+          <div class="subtab-bar" data-group="network">
+            <button class="subtab active" data-sub="ipam">Bridges &amp; IPAM Matrix</button>
+            <button class="subtab" data-sub="topology">Crystarium Topology Map</button>
+            <button class="subtab" data-sub="wol">Wake-on-LAN Portal</button>
+            <button class="subtab" data-sub="firewall">Cluster &amp; Node Firewall</button>
+          </div>
+
+          <!-- Sub-pane: IPAM -->
+          <div class="subpane active" id="sub-network-ipam">
+            <div id="ipam-conflicts" class="banner warn hidden"></div>
+            <div class="storage-grid" id="ipam-bridges-grid"></div>
+            <div class="card table-card">
+              <div class="card-header" style="padding:16px 18px 8px;">
+                <div>
+                  <h2>Guest Network Interfaces &amp; IP Allocation</h2>
+                  <p class="muted">Extracted from all guest NICs, QEMU Agent &amp; IP tags</p>
+                </div>
+                <div style="display:flex;gap:8px;align-items:center;">
+                  <input type="search" id="ipam-search" class="input" style="max-width:230px;" placeholder="Filter IP, guest, bridge, MAC..." />
+                  <select id="ipam-bridge-filter" class="input" style="max-width:155px;"></select>
+                </div>
+              </div>
+              <table class="data-table">
+                <thead><tr><th>IP Address</th><th>Guest</th><th>NIC</th><th>Bridge</th><th>VLAN</th><th>MAC</th><th>State</th><th class="right">Quick Access</th></tr></thead>
+                <tbody id="ipam-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Sub-pane: Crystarium Topology Map -->
+          <div class="subpane" id="sub-network-topology">
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <h2>Crystarium Topology Constellation</h2>
+                  <p class="muted">Visual node graph of host bridges &amp; storage pools — click any guest crystal to inspect</p>
+                </div>
+                <div class="segmented" id="crystarium-mode">
+                  <button class="seg active" data-cmode="network">By Bridge</button>
+                  <button class="seg" data-cmode="storage">By Storage</button>
+                </div>
+              </div>
+              <div id="crystarium-map" class="crystarium-wrap"></div>
+            </div>
+          </div>
+
+          <!-- Sub-pane: Wake-on-LAN -->
+          <div class="subpane" id="sub-network-wol">
+            <div class="two-col-wide">
+              <div class="card">
+                <div class="card-header">
+                  <div>
+                    <h2>Physical LAN Devices (Wake-on-LAN)</h2>
+                    <p class="muted">Send UDP Magic Packets to wake desktops, backup boxes, or secondary NAS hosts</p>
+                  </div>
+                  <button class="btn btn-xs" id="btn-wol-refresh">↻ Check Reachability</button>
+                </div>
+                <div id="wol-devices-list" class="mini-list"></div>
+              </div>
+              <div class="card">
+                <div class="card-header"><h2>Register LAN Device</h2></div>
+                <form id="form-wol-add" class="form-grid">
+                  <div class="field full"><label>Device Name *</label><input class="input" name="name" required placeholder="e.g. Gaming-Rig / Offsite-NAS" /></div>
+                  <div class="field full"><label>MAC Address *</label><input class="input mono" name="mac" required placeholder="AA:BB:CC:DD:EE:FF" /></div>
+                  <div class="field"><label>IP Address (for reachability check)</label><input class="input mono" name="ip" placeholder="192.168.1.120" /></div>
+                  <div class="field"><label>Broadcast Address</label><input class="input mono" name="broadcast" value="255.255.255.255" /></div>
+                  <div class="field full"><label>Notes</label><input class="input" name="notes" placeholder="Optional description" /></div>
+                  <div class="field full"><button type="submit" class="btn btn-primary btn-sm">Save LAN Device</button></div>
+                </form>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sub-pane: Firewall -->
+          <div class="subpane" id="sub-network-firewall">
+            <div class="card">
+              <div class="card-header">
+                <h2>Cluster &amp; Node Firewall Rules</h2>
+                <span class="status-pill subtle" id="fw-status-pill">Checking...</span>
+              </div>
+              <div id="fw-rules-wrap"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ═══════════════════════════════════════════════════════════
+             PARADIGM 06: SYSTEM (iDRAC Power, APT/Syslog, Tasks/Audit, Alerts, Settings)
+             ═══════════════════════════════════════════════════════════ -->
+        <section class="view" id="view-system">
+          <div class="subtab-bar" data-group="system">
+            <button class="subtab active" data-sub="hardware">Dell R640 Power &amp; Thermals</button>
+            <button class="subtab" data-sub="maintenance">APT Updates &amp; Syslog</button>
+            <button class="subtab" data-sub="tasks">Tasks &amp; MCP Audit</button>
+            <button class="subtab" data-sub="alerts">Alert Webhooks</button>
+            <button class="subtab" data-sub="settings">MCP &amp; Settings</button>
+          </div>
+
+          <!-- Sub-pane: Dell R640 iDRAC Hardware & Power -->
+          <div class="subpane active" id="sub-system-hardware">
+            <div id="idrac-wrap"></div>
+          </div>
+
+          <!-- Sub-pane: APT Updates & Live Syslog -->
+          <div class="subpane" id="sub-system-maintenance">
+            <div class="two-col">
+              <div class="card">
+                <div class="card-header">
+                  <div>
+                    <h2>Pending Proxmox / APT Updates (<span id="apt-count">0</span>)</h2>
+                    <p class="muted">Pending kernel, ZFS &amp; Proxmox package updates</p>
+                  </div>
+                  <button class="btn btn-sm" id="btn-apt-refresh" data-write-btn>↻ Refresh APT</button>
+                </div>
+                <div id="apt-updates-wrap" class="mini-list" style="max-height:360px;"></div>
+              </div>
+              <div class="card">
+                <div class="card-header">
+                  <h2>Live Host Syslog</h2>
+                  <div style="display:flex;gap:6px;">
+                    <input class="input mono" id="syslog-service" style="max-width:150px;" placeholder="Service filter..." />
+                    <button class="btn btn-xs" id="btn-syslog-refresh">Reload</button>
+                  </div>
+                </div>
+                <pre class="terminal" id="host-syslog" style="max-height:360px;"></pre>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sub-pane: Tasks & MCP Audit -->
+          <div class="subpane" id="sub-system-tasks">
+            <div class="two-col">
+              <div class="card">
+                <div class="card-header">
+                  <h2>Proxmox Background Tasks</h2>
+                  <label class="auto-refresh-toggle">
+                    <input type="checkbox" id="tasks-errors-only" />
+                    <span>Errors only</span>
+                  </label>
+                </div>
+                <div id="tasks-list" class="mini-list"></div>
+              </div>
+              <div class="card">
+                <div class="card-header">
+                  <h2>Unified MCP &amp; WebUI Audit Log</h2>
+                  <div class="segmented" id="audit-source-filter">
+                    <button class="seg active" data-val="">All</button>
+                    <button class="seg" data-val="mcp">MCP</button>
+                    <button class="seg" data-val="webui">UI</button>
+                  </div>
+                </div>
+                <div id="audit-list" class="mini-list"></div>
+              </div>
+            </div>
+            <div class="card hidden" id="task-log-panel">
+              <div class="card-header">
+                <h2 class="mono" id="task-log-title">Task Console Output</h2>
+                <button class="btn btn-ghost btn-sm" id="btn-close-log">✕ Close</button>
+              </div>
+              <pre class="terminal" id="task-log-content"></pre>
+            </div>
+          </div>
+
+          <!-- Sub-pane: Smart Alert Webhooks -->
+          <div class="subpane" id="sub-system-alerts">
+            <div class="card" style="max-width:780px;">
+              <div class="card-header">
+                <div>
+                  <h2>Smart Alert Webhooks (Pulse-Style)</h2>
+                  <p class="muted">Push health, storage, service downtime &amp; task failure alerts to Discord, Slack, or ntfy</p>
+                </div>
+              </div>
+              <form id="form-alerts" class="form-grid">
+                <div class="field">
+                  <label>Provider</label>
+                  <select class="input" name="provider">
+                    <option value="discord">Discord Webhook</option>
+                    <option value="slack">Slack Webhook</option>
+                    <option value="ntfy">ntfy Topic URL</option>
+                    <option value="generic">Generic JSON Webhook</option>
+                  </select>
+                </div>
+                <div class="field"><label>Health Score Threshold (&lt;)</label><input class="input mono" name="min_health_score" type="number" value="75" min="0" max="100" /></div>
+                <div class="field full"><label>Webhook URL</label><input class="input mono" name="webhook_url" placeholder="https://discord.com/api/webhooks/... or https://ntfy.sh/my-homelab" /></div>
+                <div class="field"><label>Storage Alert %</label><input class="input mono" name="max_storage_pct" type="number" value="85" /></div>
+                <div class="field"><label>CPU / RAM Alert %</label><div style="display:flex;gap:6px;"><input class="input mono" name="max_cpu_pct" type="number" value="90" /><input class="input mono" name="max_ram_pct" type="number" value="90" /></div></div>
+                <div class="field full checkbox-row">
+                  <label><input type="checkbox" name="enabled" /> Enable Alert Dispatch</label>
+                  <label><input type="checkbox" name="notify_failed_tasks" checked /> Notify on failed tasks</label>
+                </div>
+                <div class="field full form-actions">
+                  <button type="submit" class="btn btn-primary btn-sm">Save Alert Rules</button>
+                  <button type="button" class="btn btn-sm" id="btn-alert-test">🔔 Test Webhook</button>
+                  <button type="button" class="btn btn-ghost btn-sm" id="btn-alert-eval">⚡ Evaluate Now</button>
+                </div>
+              </form>
+              <div id="alert-eval-result" class="test-result hidden"></div>
+            </div>
+          </div>
+
+          <!-- Sub-pane: MCP & Settings -->
+          <div class="subpane" id="sub-system-settings">
+            <div class="two-col">
+              <div class="card">
+                <div class="card-header">
+                  <div>
+                    <h2>Proxmox VE, SSH &amp; Dell iDRAC Settings</h2>
+                    <p class="muted">Saved locally to <code>.env</code> — never transmitted externally</p>
+                  </div>
+                </div>
+                <form id="form-settings" class="form-grid">
+                  <div class="field full"><label>Proxmox Host URL</label><input class="input mono" name="proxmox_host" value="https://192.168.1.2:8006" required /></div>
+                  <div class="field full"><label>API Token ID (<code>user@realm!tokenname</code>)</label><input class="input mono" name="proxmox_token_id" /></div>
+                  <div class="field full">
+                    <label>API Token Secret (UUID)</label>
+                    <input class="input mono" name="proxmox_token_secret" type="password" placeholder="Leave blank to keep saved secret" />
+                    <span class="hint mono" id="saved-secret-hint"></span>
+                  </div>
+                  <div class="field">
+                    <label>Safety Mode</label>
+                    <select class="input" name="safety_mode">
+                      <option value="read_only">Read-Only (Monitoring only)</option>
+                      <option value="safe">Safe (Allow create/power/backup; block delete)</option>
+                      <option value="full">Full (Allow destructive with confirm)</option>
+                    </select>
+                  </div>
+                  <div class="field"><label>Request Timeout (s)</label><input class="input mono" name="proxmox_timeout" type="number" value="30" /></div>
+
+                  <div class="field"><label>SSH User (Direct Scripts / LXC Docker)</label><input class="input mono" name="proxmox_ssh_user" value="root" /></div>
+                  <div class="field"><label>SSH Port</label><input class="input mono" name="proxmox_ssh_port" type="number" value="22" /></div>
+                  <div class="field full"><label>SSH Private Key Path (optional)</label><input class="input mono" name="proxmox_ssh_key_path" placeholder="Blank uses default ~/.ssh/id_*" /></div>
+
+                  <div class="field"><label>Dell iDRAC IP / URL (optional)</label><input class="input mono" name="idrac_host" placeholder="https://192.168.1.x" /></div>
+                  <div class="field"><label>iDRAC User</label><input class="input mono" name="idrac_user" value="root" /></div>
+                  <div class="field">
+                    <label>iDRAC Password</label>
+                    <input class="input mono" name="idrac_password" type="password" placeholder="Leave blank to keep saved" />
+                  </div>
+                  <div class="field">
+                    <label>Electricity Rate &amp; Currency</label>
+                    <div style="display:flex;gap:6px;">
+                      <input class="input mono" name="currency_symbol" value="£" style="max-width:56px;" />
+                      <input class="input mono" name="electricity_rate_kwh" type="number" step="0.01" value="0.26" />
+                    </div>
+                  </div>
+
+                  <div class="field full checkbox-row">
+                    <label><input type="checkbox" name="proxmox_verify_ssl" /> Verify Proxmox SSL</label>
+                    <label><input type="checkbox" name="allow_destructive" /> Allow destructive actions</label>
+                    <label><input type="checkbox" name="proxmox_demo_mode" /> <strong>Demo Mode</strong></label>
+                  </div>
+                  <div class="field full form-actions">
+                    <button type="submit" class="btn btn-primary">Save Settings</button>
+                    <button type="button" class="btn btn-ghost" id="btn-test-conn">⚡ Test Proxmox</button>
+                  </div>
+                </form>
+                <div id="test-conn-result" class="test-result hidden"></div>
+              </div>
+
+              <div class="card">
+                <div class="card-header">
+                  <div>
+                    <h2>Connect AI Clients (MCP Setup)</h2>
+                    <p class="muted">Local <code>stdio</code> or live Streamable HTTP (<code>/mcp</code>)</p>
+                  </div>
+                </div>
+                <div class="code-section">
+                  <div class="code-header">
+                    <span>Option A: Local stdio (Antigravity / Claude / Cursor)</span>
+                    <button class="btn btn-ghost btn-sm" id="btn-copy-stdio">Copy</button>
+                  </div>
+                  <pre class="code-block" id="mcp-stdio-json"></pre>
+                </div>
+                <div class="code-section">
+                  <div class="code-header">
+                    <span>Option B: Streamable HTTP</span>
+                    <button class="btn btn-ghost btn-sm" id="btn-copy-http">Copy</button>
+                  </div>
+                  <pre class="code-block" id="mcp-http-json"></pre>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-header">
+                <h2>Exposed MCP Tool Catalog (<span id="mcp-tool-count">44</span> Tools)</h2>
+              </div>
+              <div id="mcp-tools-grid" class="tools-grid"></div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <!-- Mobile Bottom Paradigm HUD Dock -->
+  <nav class="mobile-dock" id="mobile-dock">
+    <button class="active" data-view="command">Cmd</button>
+    <button data-view="fleet">Fleet</button>
+    <button data-view="deploy">Deploy</button>
+    <button data-view="storage">Store</button>
+    <button data-view="network">Net</button>
+    <button data-view="system">Sys</button>
+  </nav>
+
+  <!-- Guest Inspector Slide-Over Drawer -->
+  <div class="drawer-backdrop hidden" id="drawer-backdrop"></div>
+  <aside class="drawer hidden" id="guest-drawer">
+    <div class="drawer-header">
+      <div>
+        <div class="drawer-title-row">
+          <span class="tag" id="drawer-type-tag">QEMU</span>
+          <h2 id="drawer-title">VM 100</h2>
+          <span class="status-pill" id="drawer-status">running</span>
+        </div>
+        <div class="muted small mono" id="drawer-meta"></div>
+      </div>
+      <button class="btn btn-ghost btn-sm" id="btn-close-drawer">✕</button>
+    </div>
+    <div class="drawer-actions" id="drawer-power-bar"></div>
+    <div class="drawer-tabs" id="drawer-tabs">
+      <button class="seg active" data-dtab="overview">Telemetry &amp; Config</button>
+      <button class="seg" data-dtab="snapshots">Snapshots</button>
+      <button class="seg" data-dtab="ops">Clone, Backup &amp; Danger</button>
+    </div>
+    <div class="drawer-body" id="drawer-body"></div>
+  </aside>
+
+  <!-- Community Script Setup Modal (Streamlined Quick Defaults + Collapsible Advanced Drawer) -->
+  <div class="cmdk-backdrop hidden" id="cs-modal-backdrop" style="padding-top:4vh;">
+    <div class="cs-modal" style="width:min(760px,95vw);">
+      <div class="drawer-header" style="margin-bottom:10px;">
+        <div>
+          <div class="drawer-title-row">
+            <span class="tag tag-cyan" id="cs-m-type">LXC</span>
+            <h2 id="cs-m-title">Configure Script</h2>
+            <a class="link-pill" id="cs-m-docs" href="#" target="_blank" rel="noopener">Docs ↗</a>
+          </div>
+          <div class="muted small" id="cs-m-desc" style="margin-top:4px;"></div>
+          <div class="tag-row" id="cs-m-defaults-pills" style="margin-top:7px;"></div>
+        </div>
+        <button class="btn btn-ghost btn-sm" id="btn-cs-close">✕</button>
+      </div>
+
+      <form id="form-cs-setup" class="stack" style="gap:11px;">
+        <!-- Quick Essential Setup (Always visible, clean & pre-populated!) -->
+        <div class="cs-section">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <span class="muted small">QUICK SETUP (PRE-FILLED FROM COMMUNITY-SCRIPTS DEFAULTS)</span>
+            <label class="auto-refresh-toggle">
+              <input type="checkbox" name="unattended" checked />
+              <span><strong>Unattended</strong></span>
+            </label>
+          </div>
+          <div class="form-grid-3">
+            <div class="field"><label>CTID</label><input class="input mono" name="ctid" type="number" /></div>
+            <div class="field"><label>Hostname</label><input class="input mono" name="hostname" /></div>
+            <div class="field"><label>CPU / RAM (MB) / Disk (GB)</label>
+              <div style="display:grid;grid-template-columns:1fr 1.3fr 1fr;gap:5px;">
+                <input class="input mono" name="cpu" type="number" min="1" max="64" title="CPU Cores" />
+                <input class="input mono" name="ram" type="number" step="128" min="128" title="RAM MB" />
+                <input class="input mono" name="disk" type="number" min="1" title="Disk GB" />
+              </div>
+            </div>
+            <div class="field"><label>Container Storage</label><select class="input mono" name="container_storage" id="cs-container-storage"></select></div>
+            <div class="field"><label>Template Storage</label><select class="input mono" name="template_storage" id="cs-template-storage"></select></div>
+            <div class="field"><label>Bridge &amp; IPv4</label>
+              <div style="display:grid;grid-template-columns:0.85fr 1.15fr;gap:5px;">
+                <select class="input mono" name="bridge" id="cs-bridge"></select>
+                <input class="input mono" name="net" value="dhcp" placeholder="dhcp or CIDR" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Collapsible Advanced LXC Options (cleanly tucked away until needed) -->
+        <details class="guide-box" id="cs-advanced-drawer" style="margin-top:0;">
+          <summary>⚙ Advanced LXC Options (OS, Static Gateway/VLAN, GPU, FUSE, SSH, Password, Apt-Cacher)</summary>
+          <div class="form-grid-3" style="margin-top:10px;">
+            <div class="field"><label>OS</label><select class="input" name="os"><option value="debian">debian</option><option value="ubuntu">ubuntu</option><option value="alpine">alpine</option><option value="rockylinux">rockylinux</option></select></div>
+            <div class="field"><label>OS Version</label><input class="input mono" name="version" /></div>
+            <div class="field"><label>Tags</label><input class="input mono" name="tags" /></div>
+            <div class="field"><label>Gateway (if static IP)</label><input class="input mono" name="gateway" placeholder="192.168.1.1" /></div>
+            <div class="field"><label>VLAN Tag</label><input class="input mono" name="vlan" type="number" placeholder="None" /></div>
+            <div class="field"><label>DNS Server</label><input class="input mono" name="dns" placeholder="192.168.1.1" /></div>
+            <div class="field"><label>Timezone</label><input class="input mono" name="timezone" value="Europe/London" /></div>
+            <div class="field"><label>MTU</label><input class="input mono" name="mtu" type="number" placeholder="1500" /></div>
+            <div class="field"><label>IPv6</label><select class="input" name="ipv6_method"><option value="">Default</option><option value="none">none</option><option value="auto">auto</option><option value="dhcp">dhcp</option></select></div>
+            <div class="field"><label>Root Password (≥5 chars)</label><input class="input" name="password" type="password" /></div>
+            <div class="field"><label>Apt-Cacher-NG IP</label><input class="input mono" name="apt_cacher_ip" /></div>
+            <div class="field"><label>SSH Public Key</label><input class="input mono" name="ssh_authorized_key" /></div>
+          </div>
+          <div class="checkbox-row" style="margin-top:10px;">
+            <label><input type="checkbox" name="unprivileged" checked /> Unprivileged</label>
+            <label><input type="checkbox" name="nesting" checked /> Nesting</label>
+            <label><input type="checkbox" name="keyctl" checked /> Keyctl</label>
+            <label><input type="checkbox" name="fuse" /> FUSE</label>
+            <label><input type="checkbox" name="tun" /> TUN</label>
+            <label><input type="checkbox" name="gpu" /> GPU</label>
+            <label><input type="checkbox" name="ssh" /> Root SSH</label>
+            <label><input type="checkbox" name="protection" /> Protection</label>
+            <label><input type="checkbox" name="apt_cacher" /> Use Apt-Cacher</label>
+            <label><input type="checkbox" name="verbose" /> Verbose</label>
+          </div>
+        </details>
+
+        <div class="code-section" style="margin:0;">
+          <div class="code-header">
+            <span>Generated Install Command</span>
+            <div style="display:flex;gap:6px;">
+              <button type="button" class="btn btn-xs" id="btn-cs-copy">📋 Copy</button>
+              <a class="btn btn-xs" id="btn-cs-shell" href="#" target="_blank" rel="noopener">&gt;_ Host Shell</a>
+              <button type="submit" class="btn btn-xs btn-primary" id="btn-cs-deploy" data-write-btn>🚀 Deploy SSH</button>
+            </div>
+          </div>
+          <pre class="code-block" id="cs-cmd-preview" style="max-height:130px;"></pre>
+        </div>
+        <div id="cs-deploy-log-wrap" class="hidden">
+          <div class="code-header"><span id="cs-deploy-status" class="mono small">Deploying...</span></div>
+          <pre class="terminal" id="cs-deploy-log" style="max-height:220px;"></pre>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Global Command Palette (Ctrl+K) -->
+  <div class="cmdk-backdrop hidden" id="cmdk-backdrop">
+    <div class="cmdk-modal">
+      <input type="search" id="cmdk-input" class="cmdk-input" placeholder="Jump to any VM/LXC, app, paradigm, or tool... (Esc to close)" />
+      <div id="cmdk-results" class="cmdk-results"></div>
+    </div>
+  </div>
+
+  <!-- Toasts -->
+  <div class="toast-container" id="toasts"></div>
+
+  <script type="module" src="/static/app.js"></script>
+</body>
+</html>
